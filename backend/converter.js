@@ -2,7 +2,12 @@ const fs = require("fs");
 const path = require("path");
 const db = require("./db");
 
-const CONVERTED_DIR = path.join(__dirname, "converted");
+const IS_VERCEL = !!process.env.VERCEL;
+const CONVERTED_DIR = IS_VERCEL ? "/tmp/converted" : path.join(__dirname, "converted");
+
+if (!fs.existsSync(CONVERTED_DIR)) {
+  fs.mkdirSync(CONVERTED_DIR, { recursive: true });
+}
 
 async function processJob(job) {
   try {

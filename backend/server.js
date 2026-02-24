@@ -20,13 +20,86 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+const CONVERT_RATE_WINDOW_MS = Number(process.env.CONVERT_RATE_WINDOW_MS || 10 * 60 * 1000);
+const CONVERT_RATE_MAX = Number(process.env.CONVERT_RATE_MAX || 8);
+const READ_RATE_WINDOW_MS = Number(process.env.READ_RATE_WINDOW_MS || 60 * 1000);
+const READ_RATE_MAX = Number(process.env.READ_RATE_MAX || 120);
+const MAX_ACTIVE_CONVERSIONS_PER_IP = Number(process.env.MAX_ACTIVE_CONVERSIONS_PER_IP || 2);
 
 // Use /tmp on Vercel (serverless), local dirs otherwise
 const IS_VERCEL = !!process.env.VERCEL;
 const uploadsDir = IS_VERCEL ? "/tmp/uploads" : path.join(__dirname, "uploads");
 const convertedDir = IS_VERCEL ? "/tmp/converted" : path.join(__dirname, "converted");
+const rateBuckets = new Map();
+const activeConversionsByIp = new Map();
+
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.length > 0) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || "unknown";
+}
+
+function createRateLimiter({ bucketKey, windowMs, maxRequests }) {
+  return (req, res, next) => {
+    const ip = getClientIp(req);
+    const key = `${bucketKey}:${ip}`;
+    const now = Date.now();
+    const bucket = rateBuckets.get(key) || { resetAt: now + windowMs, hits: 0 };
+
+    if (now > bucket.resetAt) {
+      bucket.hits = 0;
+      bucket.resetAt = now + windowMs;
+    }
+
+    bucket.hits += 1;
+    rateBuckets.set(key, bucket);
+
+    if (bucket.hits > maxRequests) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+      res.setHeader("Retry-After", String(retryAfterSeconds));
+      return res.status(429).json({
+        error: "Too many requests. Please wait and try again.",
+      });
+    }
+
+    next();
+  };
+}
+
+function limitActiveConversions(req, res, next) {
+  const ip = getClientIp(req);
+  const active = activeConversionsByIp.get(ip) || 0;
+  if (active >= MAX_ACTIVE_CONVERSIONS_PER_IP) {
+    return res.status(429).json({
+      error: "Too many active conversions from this IP. Please wait for current jobs to finish.",
+    });
+  }
+
+  activeConversionsByIp.set(ip, active + 1);
+  res.on("finish", () => {
+    const current = activeConversionsByIp.get(ip) || 0;
+    if (current <= 1) {
+      activeConversionsByIp.delete(ip);
+      return;
+    }
+    activeConversionsByIp.set(ip, current - 1);
+  });
+  next();
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateBuckets.entries()) {
+    if (bucket.resetAt < now) {
+      rateBuckets.delete(key);
+    }
+  }
+}, 60 * 1000).unref();
 
 // -- Middleware --
+app.set("trust proxy", 1);
 app.use(
   cors({
     origin(origin, callback) {
@@ -39,6 +112,16 @@ app.use(
   })
 );
 app.use(express.json());
+const convertLimiter = createRateLimiter({
+  bucketKey: "convert",
+  windowMs: CONVERT_RATE_WINDOW_MS,
+  maxRequests: CONVERT_RATE_MAX,
+});
+const readLimiter = createRateLimiter({
+  bucketKey: "read",
+  windowMs: READ_RATE_WINDOW_MS,
+  maxRequests: READ_RATE_MAX,
+});
 
 // -- Ensure dirs exist --
 if (!fs.existsSync(uploadsDir)) {
@@ -60,9 +143,14 @@ app.get("/api/health", (req, res) => {
 // =============================================
 // D-001: POST /api/convert
 // =============================================
-app.post("/api/convert", upload.single("file"), async (req, res) => {
+app.post("/api/convert", convertLimiter, limitActiveConversions, upload.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "File is required" });
+  }
+
+  if (req.file.originalname.length > 255) {
+    fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: "Filename is too long." });
   }
 
   const ext = path.extname(req.file.originalname).replace(".", "").toLowerCase();
@@ -95,35 +183,40 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
     return res.status(400).json({ error: "analysisConsent is required when analysisMode is 'convert_plus_insights'" });
   }
 
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + TTL_MINUTES * 60_000);
-  const jobId = uuidv4();
+  try {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + TTL_MINUTES * 60_000);
+    const jobId = uuidv4();
 
-  const job = await db.createJob({
-    id: jobId,
-    originalName: req.file.originalname,
-    originalPath: req.file.path,
-    targetFormat,
-    preset,
-    analysisMode,
-    analysisConsent: analysisConsent ? 1 : 0,
-    status: "queued",
-    progress: 0,
-    createdAt: now.toISOString(),
-    expiresAt: expiresAt.toISOString(),
-  });
+    const job = await db.createJob({
+      id: jobId,
+      originalName: req.file.originalname,
+      originalPath: req.file.path,
+      targetFormat,
+      preset,
+      analysisMode,
+      analysisConsent: analysisConsent ? 1 : 0,
+      status: "queued",
+      progress: 0,
+      createdAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+    });
 
-  // Await processing — required for Vercel serverless (function freezes after response)
-  await processJob(job);
+    // Await processing — required for Vercel serverless (function freezes after response)
+    await processJob(job);
 
-  const completed = await db.getJob(job.id);
-  res.status(201).json({ jobId: completed.id, status: completed.status });
+    const completed = await db.getJob(job.id);
+    res.status(201).json({ jobId: completed.id, status: completed.status });
+  } catch (err) {
+    console.error("Convert error:", err);
+    res.status(500).json({ error: err.message || "Internal server error" });
+  }
 });
 
 // =============================================
 // D-002: GET /api/jobs/:id
 // =============================================
-app.get("/api/jobs/:id", async (req, res) => {
+app.get("/api/jobs/:id", readLimiter, async (req, res) => {
   const job = await db.getJob(req.params.id);
   if (!job) {
     return res.status(404).json({ error: "Job not found" });
@@ -134,7 +227,7 @@ app.get("/api/jobs/:id", async (req, res) => {
 // =============================================
 // D-003: GET /api/jobs/:id/download
 // =============================================
-app.get("/api/jobs/:id/download", async (req, res) => {
+app.get("/api/jobs/:id/download", readLimiter, async (req, res) => {
   const job = await db.getJob(req.params.id);
   if (!job) {
     return res.status(404).json({ error: "Job not found" });
@@ -153,7 +246,7 @@ app.get("/api/jobs/:id/download", async (req, res) => {
 // =============================================
 // D-004: GET /api/jobs/:id/insights
 // =============================================
-app.get("/api/jobs/:id/insights", async (req, res) => {
+app.get("/api/jobs/:id/insights", readLimiter, async (req, res) => {
   const job = await db.getJob(req.params.id);
   if (!job) {
     return res.status(404).json({ error: "Job not found" });
@@ -174,7 +267,7 @@ app.get("/api/jobs/:id/insights", async (req, res) => {
 // =============================================
 // D-005: DELETE /api/jobs/:id
 // =============================================
-app.delete("/api/jobs/:id", async (req, res) => {
+app.delete("/api/jobs/:id", readLimiter, async (req, res) => {
   const job = await db.getJob(req.params.id);
   if (!job) {
     return res.status(404).json({ error: "Job not found" });
