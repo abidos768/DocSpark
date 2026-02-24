@@ -153,18 +153,25 @@ async function tryServerlessPdf(inputPath, outputPath, sourceExt, targetExt) {
   }
 }
 
-async function generatePdfBufferFromHtml(htmlContent) {
-  let chromium;
-  let puppeteer;
-  try {
-    chromium = require("@sparticuz/chromium");
-    puppeteer = require("puppeteer-core");
-  } catch {
-    throw new Error("serverless_pdf_runtime_missing");
-  }
+const LOCAL_CHROME_PATHS = [
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+  process.env.LOCALAPPDATA
+    ? path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "Application", "chrome.exe")
+    : "",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/bin/chromium-browser",
+  "/usr/bin/chromium",
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+].filter(Boolean);
 
+async function generatePdfBufferFromHtml(htmlContent) {
+  // Strategy 1: serverless Chromium (@sparticuz/chromium) — works on Vercel/Lambda
   let browser;
   try {
+    const chromium = require("@sparticuz/chromium");
+    const puppeteer = require("puppeteer-core");
     const executablePath = await chromium.executablePath();
     browser = await puppeteer.launch({
       args: chromium.args,
@@ -174,19 +181,41 @@ async function generatePdfBufferFromHtml(htmlContent) {
     });
     const page = await browser.newPage();
     await page.setContent(String(htmlContent || ""), { waitUntil: "networkidle0" });
-    return await page.pdf({
-      format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true,
-    });
-  } finally {
-    if (browser) {
-      try {
-        await browser.close();
-      } catch {
-        // ignore close errors
-      }
+    return await page.pdf({ format: "A4", printBackground: true, preferCSSPageSize: true });
+  } catch (serverlessErr) {
+    if (browser) try { await browser.close(); } catch {}
+    browser = null;
+
+    // Strategy 2: local Chrome/Chromium via puppeteer-core
+    const localPath = LOCAL_CHROME_PATHS.find((p) => fs.existsSync(p));
+    if (!localPath) {
+      throw new Error(
+        `serverless_pdf_runtime_missing and no local Chrome found. Serverless error: ${serverlessErr.message}`
+      );
     }
+
+    let puppeteer;
+    try {
+      puppeteer = require("puppeteer-core");
+    } catch {
+      throw new Error("puppeteer-core is not installed");
+    }
+
+    try {
+      browser = await puppeteer.launch({
+        executablePath: localPath,
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+        defaultViewport: { width: 1280, height: 720 },
+      });
+      const page = await browser.newPage();
+      await page.setContent(String(htmlContent || ""), { waitUntil: "networkidle0" });
+      return await page.pdf({ format: "A4", printBackground: true, preferCSSPageSize: true });
+    } finally {
+      if (browser) try { await browser.close(); } catch {}
+    }
+  } finally {
+    if (browser) try { await browser.close(); } catch {}
   }
 }
 
