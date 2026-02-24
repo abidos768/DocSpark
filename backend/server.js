@@ -113,10 +113,11 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
     expiresAt: expiresAt.toISOString(),
   });
 
-  // Start async processing (don't await — runs in background)
-  processJob(job);
+  // Await processing — required for Vercel serverless (function freezes after response)
+  await processJob(job);
 
-  res.status(201).json({ jobId: job.id, status: job.status });
+  const completed = await db.getJob(job.id);
+  res.status(201).json({ jobId: completed.id, status: completed.status });
 });
 
 // =============================================
