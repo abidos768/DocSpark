@@ -349,6 +349,13 @@ app.post("/api/convert", convertLimiter, limitActiveConversions, upload.single("
     await processJob(job);
 
     const completed = await db.getJob(job.id);
+    if (completed.status !== "done") {
+      return res.status(422).json({
+        error: "Requested conversion is not supported by the current converter.",
+        jobId: completed.id,
+        status: completed.status,
+      });
+    }
     res.status(201).json({ jobId: completed.id, status: completed.status });
   } catch (err) {
     console.error("Convert error:", err);
