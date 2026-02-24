@@ -241,6 +241,33 @@ body {
   margin-top: 1.2rem;
 }
 
+.mini-band {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.mini-band-item {
+  background: var(--surface-glass);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.9rem;
+  padding: 0.9rem;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.mini-band-item h3 {
+  margin: 0 0 0.35rem;
+  font-family: Fraunces, Georgia, serif;
+}
+
+.mini-band-item p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
 .card {
   background: var(--surface-glass);
   border: 1px solid var(--line-strong);
@@ -497,6 +524,77 @@ body {
   min-height: 66px;
 }
 
+.pricing-grid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.pricing-card {
+  background: var(--surface-glass);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.95rem;
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.pricing-card h3 {
+  margin: 0.55rem 0 0.25rem;
+  font-family: Fraunces, Georgia, serif;
+}
+
+.pricing-price {
+  margin: 0 0 0.65rem;
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+
+.pricing-price span {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.pricing-card ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--ink-soft);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.tag-alt {
+  background: linear-gradient(120deg, #5c6ac4, #87a5ff);
+}
+
+.privacy-list {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.privacy-item {
+  background: var(--surface-glass);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.85rem;
+  padding: 0.85rem 0.95rem;
+}
+
+.privacy-item h3 {
+  margin: 0 0 0.2rem;
+  font-family: Fraunces, Georgia, serif;
+}
+
+.privacy-item p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.notfound-page .btn-row {
+  margin-top: 0.9rem;
+}
+
 .form-grid input:focus,
 .form-grid textarea:focus,
 .form-grid select:focus,
@@ -598,6 +696,14 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .mini-band {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+
   .convert-layout {
     grid-template-columns: 1fr;
   }
@@ -621,6 +727,10 @@ body {
   }
 
   .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .mini-band {
     grid-template-columns: 1fr;
   }
 

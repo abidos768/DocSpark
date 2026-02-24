@@ -82,6 +82,20 @@ function renderHome() {
         </article>
       </div>
     </section>
+    <section class="mini-band">
+      <div class="mini-band-item">
+        <h3>Fast by Design</h3>
+        <p>Most conversions complete in seconds with live status updates.</p>
+      </div>
+      <div class="mini-band-item">
+        <h3>Consent by Default</h3>
+        <p>Smart Output Pack never runs unless you actively enable it.</p>
+      </div>
+      <div class="mini-band-item">
+        <h3>Built for Real Work</h3>
+        <p>Presets and configuration options keep output consistent across teams.</p>
+      </div>
+    </section>
   `;
 }
 
@@ -206,30 +220,67 @@ function renderConvert() {
 
 function renderPricing() {
   return `
-    <section class="about">
+    <section class="about pricing-page">
       <h1 class="section-title">Pricing</h1>
-      <p><strong>Free:</strong> Core conversion with temporary file storage.</p>
-      <p><strong>Pro (planned):</strong> Higher file limits and longer retention windows.</p>
+      <p>Start free, then scale when your workflow needs higher limits.</p>
+      <div class="pricing-grid">
+        <article class="pricing-card">
+          <span class="tag">Current</span>
+          <h3>Free</h3>
+          <p class="pricing-price">$0</p>
+          <ul>
+            <li>Core format conversion</li>
+            <li>Consent-based Smart Output Pack</li>
+            <li>Temporary secure storage</li>
+          </ul>
+        </article>
+        <article class="pricing-card">
+          <span class="tag tag-alt">Planned</span>
+          <h3>Pro</h3>
+          <p class="pricing-price">$19<span>/month</span></p>
+          <ul>
+            <li>Higher file-size thresholds</li>
+            <li>Longer retention windows</li>
+            <li>Priority processing queue</li>
+          </ul>
+        </article>
+      </div>
     </section>
   `;
 }
 
 function renderPrivacy() {
   return `
-    <section class="about">
+    <section class="about privacy-page">
       <h1 class="section-title">Privacy</h1>
-      <p>Convert-only is the default mode for every upload.</p>
-      <p>Smart Output Pack runs only if you choose insights mode and explicitly consent.</p>
-      <p>Files are temporary and auto-deleted by backend TTL policy.</p>
+      <p>Privacy controls are part of the product, not a hidden setting.</p>
+      <div class="privacy-list">
+        <article class="privacy-item">
+          <h3>Convert-Only Default</h3>
+          <p>Every upload starts in convert-only mode automatically.</p>
+        </article>
+        <article class="privacy-item">
+          <h3>Explicit Opt-In</h3>
+          <p>Smart Output Pack is available only after mode selection and consent.</p>
+        </article>
+        <article class="privacy-item">
+          <h3>Time-Limited Storage</h3>
+          <p>Temporary files are auto-removed by TTL cleanup policy.</p>
+        </article>
+      </div>
     </section>
   `;
 }
 
 function renderNotFound() {
   return `
-    <section class="about">
+    <section class="about notfound-page">
       <h1 class="section-title">Page not found</h1>
       <p>Use the top navigation to continue.</p>
+      <div class="btn-row">
+        <a class="btn btn-primary" href="#/">Back to Home</a>
+        <a class="btn btn-ghost" href="#/convert">Open Converter</a>
+      </div>
     </section>
   `;
 }
