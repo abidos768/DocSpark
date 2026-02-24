@@ -1,3 +1,8 @@
 module.exports = (req, res) => {
-  res.json({ ok: true, env_has_db: !!process.env.DATABASE_URL });
+  try {
+    const app = require("../backend/server");
+    res.json({ ok: true, type: typeof app });
+  } catch (err) {
+    res.json({ ok: false, error: err.message, stack: err.stack });
+  }
 };
