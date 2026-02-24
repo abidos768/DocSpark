@@ -92,6 +92,8 @@ function renderConvert() {
             <label>
               File
               <input id="file" name="file" type="file" />
+              <small class="field-hint">Supports PDF, DOCX, TXT up to 25MB.</small>
+              <small class="file-pill" id="file-pill">No file selected</small>
               <small class="error" id="file-error"></small>
             </label>
           </div>
@@ -132,6 +134,7 @@ function renderConvert() {
               <input id="analysisConsent" name="analysisConsent" type="checkbox" />
               I agree to process this file for optional insights.
             </label>
+            <small class="field-hint" id="consent-hint">Enable Smart Output Pack to activate this consent checkbox.</small>
             <small class="error" id="consent-error"></small>
           </div>
 
@@ -191,7 +194,48 @@ function bindEvents(path) {
   }
 
   const form = document.getElementById("convert-form");
+  setupConvertFormUx();
   form?.addEventListener("submit", onConvertSubmit);
+}
+
+function setupConvertFormUx() {
+  const fileInput = document.getElementById("file");
+  const modeSelect = document.getElementById("analysisMode");
+  const consentInput = document.getElementById("analysisConsent");
+  const consentBlock = document.querySelector(".consent-block");
+  const consentHint = document.getElementById("consent-hint");
+  const filePill = document.getElementById("file-pill");
+
+  const syncModeState = () => {
+    const insightsMode = modeSelect?.value === "convert_plus_insights";
+    if (consentInput) {
+      consentInput.disabled = !insightsMode;
+      if (!insightsMode) {
+        consentInput.checked = false;
+      }
+    }
+    if (consentBlock) {
+      consentBlock.classList.toggle("is-active", insightsMode);
+      consentBlock.classList.toggle("is-disabled", !insightsMode);
+    }
+    if (consentHint) {
+      consentHint.textContent = insightsMode
+        ? "Consent is required while Smart Output Pack is enabled."
+        : "Enable Smart Output Pack to activate this consent checkbox.";
+    }
+  };
+
+  const syncFileState = () => {
+    const file = fileInput?.files?.[0];
+    if (filePill) {
+      filePill.textContent = file ? `${file.name} (${Math.ceil(file.size / 1024)} KB)` : "No file selected";
+    }
+  };
+
+  modeSelect?.addEventListener("change", syncModeState);
+  fileInput?.addEventListener("change", syncFileState);
+  syncModeState();
+  syncFileState();
 }
 
 function initTheme() {

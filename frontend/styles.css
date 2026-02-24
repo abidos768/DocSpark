@@ -5,11 +5,17 @@
   --bg-accent-2: #ffe5d6;
   --surface: #ffffffc7;
   --surface-solid: #ffffff;
+  --surface-glass: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.74),
+    rgba(255, 255, 255, 0.48)
+  );
   --ink: #111827;
   --ink-soft: #4b5563;
   --brand: #2563eb;
   --brand-deep: #1e4fb8;
   --line: #d9e1ee;
+  --line-strong: rgba(255, 255, 255, 0.75);
   --success: #0d8b56;
   --error: #c62828;
   --shadow: 0 14px 40px rgba(31, 49, 84, 0.11);
@@ -22,11 +28,17 @@
   --bg-accent-2: #3f2536;
   --surface: rgba(17, 24, 39, 0.76);
   --surface-solid: #111827;
+  --surface-glass: linear-gradient(
+    135deg,
+    rgba(43, 56, 89, 0.68),
+    rgba(17, 24, 39, 0.62)
+  );
   --ink: #f3f6ff;
   --ink-soft: #afbdd9;
   --brand: #6ea8ff;
   --brand-deep: #8bb9ff;
   --line: #2a3b62;
+  --line-strong: rgba(146, 176, 236, 0.24);
   --success: #34d399;
   --error: #ff8383;
   --shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
@@ -81,11 +93,12 @@ body {
   padding: 0.72rem 0.85rem;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--surface-glass);
   display: flex;
   align-items: center;
   justify-content: space-between;
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--shadow);
 }
 
@@ -202,11 +215,13 @@ body {
 }
 
 .hero-panel {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--surface-glass);
+  border: 1px solid var(--line-strong);
   border-radius: 1.1rem;
   padding: 1.1rem;
   box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .tag {
@@ -227,11 +242,13 @@ body {
 }
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--surface-glass);
+  border: 1px solid var(--line-strong);
   border-radius: 0.95rem;
   padding: 0.95rem;
   box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .card h3 {
@@ -242,11 +259,13 @@ body {
 .about,
 .contact {
   margin-top: 1.8rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--surface-glass);
+  border: 1px solid var(--line-strong);
   border-radius: 1rem;
   padding: 1.2rem;
   box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .about p,
@@ -277,11 +296,13 @@ body {
 
 .convert-form,
 .convert-sidepanel {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--surface-glass);
+  border: 1px solid var(--line-strong);
   border-radius: 1rem;
   padding: 1.1rem;
   box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .field-row {
@@ -299,6 +320,16 @@ body {
   border: 1px solid var(--line);
   border-radius: 0.8rem;
   background: color-mix(in srgb, var(--surface-solid) 74%, transparent);
+  transition: border-color 200ms ease, opacity 200ms ease, background 200ms ease;
+}
+
+.consent-block.is-active {
+  border-color: color-mix(in srgb, var(--brand) 60%, var(--line));
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface-solid));
+}
+
+.consent-block.is-disabled {
+  opacity: 0.72;
 }
 
 .convert-sidepanel h3 {
@@ -334,6 +365,23 @@ body {
   font-weight: 600;
 }
 
+.field-hint {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.file-pill {
+  display: inline-block;
+  width: fit-content;
+  margin-top: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  padding: 0.22rem 0.55rem;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface-solid) 82%, transparent);
+  font-size: 0.8rem;
+}
+
 .form-grid input,
 .form-grid textarea,
 .form-grid select {
@@ -344,6 +392,29 @@ body {
   font: inherit;
   background: var(--surface-solid);
   color: var(--ink);
+}
+
+.form-grid input[type="file"] {
+  padding: 0.35rem 0.45rem;
+}
+
+.form-grid input[type="file"]::file-selector-button {
+  border: 1px solid color-mix(in srgb, var(--line) 35%, var(--brand));
+  border-radius: 0.48rem;
+  background: color-mix(in srgb, var(--surface-solid) 80%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  padding: 0.5rem 0.8rem;
+  margin-right: 0.6rem;
+  cursor: pointer;
+  transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.form-grid input[type="file"]::file-selector-button:hover {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 15%, var(--surface-solid));
+  transform: translateY(-1px);
 }
 
 .form-grid input:focus,
