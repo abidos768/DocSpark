@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)",
+      "Bash(node:*)",
+      "Bash(timeout /t 2 /nobreak)",
+      "Bash(curl:*)",
+      "Bash(ping:*)",
+      "Bash(del:*)",
+      "Bash(del /q \"D:\\\\Cursor\\\\down\\\\backend\\\\uploads\\\\*\")",
+      "Bash(del /q \"D:\\\\Cursor\\\\down\\\\backend\\\\converted\\\\*\")"
+    ]
+  }
+}

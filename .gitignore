@@ -1,0 +1,9 @@
+node_modules/
+.env
+*.db
+*.db-wal
+*.db-shm
+backend/uploads/
+backend/converted/
+.chrome-pdf-profile/
+.edge-pdf-profile/

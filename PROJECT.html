@@ -1,0 +1,76 @@
+﻿<!doctype html>
+<html><head><meta charset="utf-8"/><title>PROJECT</title>
+<style>body{font-family:Segoe UI,Arial,sans-serif;max-width:860px;margin:32px auto;padding:0 16px;line-height:1.55;color:#1f2937}h1,h2,h3{color:#111827}h1{font-size:30px;margin-bottom:10px}h2{font-size:22px;margin-top:28px}h3{font-size:18px;margin-top:22px}code{background:#f3f4f6;padding:2px 5px;border-radius:4px;font-family:Consolas,monospace}ul,ol{margin:8px 0 12px 24px}li{margin:4px 0}p{margin:8px 0}</style></head><body>
+<h1>DocSpark Project Brief</h1>
+<p>Date: 2026-02-23</p>
+<p>Status: Ready for implementation</p>
+<h2>Purpose</h2>
+<p>Build a document conversion website that stands out from generic converters.</p>
+<p>Core value:</p>
+<ul>
+<li>Fast conversion and download</li>
+<li>Optional advanced analysis for users who explicitly want it</li>
+</ul>
+<h2>Differentiator</h2>
+<p>DocSpark offers an optional **Smart Output Pack**:</p>
+<ul>
+<li>Plain-language summary</li>
+<li>Key field extraction (dates, totals, names)</li>
+<li>Redaction hints</li>
+<li>Quality score</li>
+</ul>
+<p>Important:</p>
+<ul>
+<li>Smart Output Pack is **opt-in only**</li>
+<li>Default user path is **convert only**</li>
+</ul>
+<h2>Privacy Rule (Critical)</h2>
+<ul>
+<li>Never run analysis by default</li>
+<li>User must actively choose analysis mode</li>
+<li>User consent is required before Smart Output Pack processing</li>
+</ul>
+<h2>MVP Scope</h2>
+<ul>
+<li>Upload file</li>
+<li>Choose target format</li>
+<li>Convert and download</li>
+<li>Optional analysis mode (with consent)</li>
+<li>Auto-delete temporary files by TTL</li>
+</ul>
+<h2>API Contract (MVP)</h2>
+<ul>
+<li><code>POST /api/convert</code></li>
+</ul>
+<p>  - Fields: <code>file</code>, <code>targetFormat</code>, <code>preset?</code>, <code>analysisMode</code>, <code>analysisConsent?</code></p>
+<p>  - <code>analysisMode</code>: <code>convert_only | convert_plus_insights</code></p>
+<p>  - <code>analysisConsent</code> required when <code>analysisMode=convert_plus_insights</code></p>
+<ul>
+<li><code>GET /api/jobs/:id</code></li>
+<li><code>GET /api/jobs/:id/download</code></li>
+<li><code>GET /api/jobs/:id/insights</code> (must return <code>409</code> for convert-only jobs)</li>
+<li><code>DELETE /api/jobs/:id</code></li>
+</ul>
+<h2>Agent Ownership</h2>
+<ul>
+<li>Agent A (Codex): Frontend (<code>frontend/*</code>)</li>
+<li>Agent B (Claude Code): Backend (<code>backend/*</code>)</li>
+</ul>
+<h2>Start Order</h2>
+<ol>
+<li>Backend bootstraps <code>/api/convert</code> + <code>/api/jobs/:id</code></li>
+<li>Frontend builds upload flow + polling</li>
+<li>Backend adds <code>/insights</code></li>
+<li>Frontend renders output pack when opted in</li>
+<li>Both complete QA</li>
+</ol>
+<h2>Source Files</h2>
+<ul>
+<li>Product detail: <code>PRODUCT_ONE_SHOT_SPEC.md</code></li>
+<li>Team coordination: <code>TEAM_SYNC.md</code></li>
+<li>Task tracking: <code>WORK_QUEUE.md</code></li>
+</ul>
+<h2>One-line Pitch</h2>
+<p>DocSpark is a converter that gives users control: simple conversion by default, and optional insights only when they ask for it.</p>
+</body></html>
+

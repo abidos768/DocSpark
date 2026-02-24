@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DocSpark</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-left"></div>
+    <div class="bg-shape bg-shape-right"></div>
+
+    <header class="site-header">
+      <a href="#/" class="brand">DocSpark</a>
+      <nav class="nav-links">
+        <a href="#/">Home</a>
+        <a href="#/convert">Convert</a>
+        <a href="#/pricing">Pricing</a>
+        <a href="#/privacy">Privacy</a>
+      </nav>
+      <div class="header-actions">
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch color theme">
+          <span id="theme-toggle-label">Dark Mode</span>
+        </button>
+        <a class="cta-link" href="#/convert">Start Converting</a>
+      </div>
+    </header>
+
+    <main id="app" class="app-shell"></main>
+
+    <footer class="site-footer">
+      <p>Convert only by default. Insights only with your consent.</p>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
