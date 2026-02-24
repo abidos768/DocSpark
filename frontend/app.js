@@ -117,7 +117,7 @@ function renderConvert() {
                 <p class="dropzone-subtitle">or click to browse</p>
               </div>
               <input id="file" name="file" type="file" class="sr-only-file" />
-              <small class="field-hint">Supports PDF, DOCX, TXT up to 250MB.</small>
+              <small class="field-hint">Supports PDF, DOCX, TXT, HTML, MD, RTF, CSV up to 250MB.</small>
               <small class="file-pill" id="file-pill">No file selected</small>
               <small class="error" id="file-error"></small>
             </label>
@@ -130,6 +130,10 @@ function renderConvert() {
                 <option value="pdf">PDF</option>
                 <option value="docx">DOCX</option>
                 <option value="txt">TXT</option>
+                <option value="html">HTML</option>
+                <option value="md">MD</option>
+                <option value="rtf">RTF</option>
+                <option value="csv">CSV</option>
               </select>
             </label>
 

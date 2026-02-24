@@ -14,8 +14,8 @@ const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 3000);
 const TTL_MINUTES = 30;
 const MAX_FILE_SIZE = 250 * 1024 * 1024; // 250 MB
-const ALLOWED_INPUT_FORMATS = ["pdf", "docx", "txt"];
-const ALLOWED_OUTPUT_FORMATS = ["pdf", "docx", "txt"];
+const ALLOWED_INPUT_FORMATS = ["pdf", "docx", "txt", "html", "md", "rtf", "csv"];
+const ALLOWED_OUTPUT_FORMATS = ["pdf", "docx", "txt", "html", "md", "rtf", "csv"];
 const ALLOWED_PRESETS = ["resume-safe", "print-safe", "mobile-safe"];
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || "")
   .split(",")
@@ -37,6 +37,13 @@ const convertedDir = IS_VERCEL ? "/tmp/converted" : path.join(__dirname, "conver
 const rateBuckets = new Map();
 const activeConversionsByIp = new Map();
 const recentFingerprints = new Map();
+
+function normalizeFormat(format) {
+  const normalized = String(format || "").trim().toLowerCase();
+  if (normalized === "htm") return "html";
+  if (normalized === "markdown") return "md";
+  return normalized;
+}
 
 function getClientIp(req) {
   const forwarded = req.headers["x-forwarded-for"];
@@ -267,13 +274,13 @@ app.post("/api/convert", convertLimiter, limitActiveConversions, upload.single("
     return res.status(400).json({ error: "Filename is too long." });
   }
 
-  const ext = path.extname(req.file.originalname).replace(".", "").toLowerCase();
+  const ext = normalizeFormat(path.extname(req.file.originalname).replace(".", ""));
   if (!ALLOWED_INPUT_FORMATS.includes(ext)) {
     fs.unlinkSync(req.file.path);
     return res.status(400).json({ error: `Unsupported input format: ${ext}. Allowed: ${ALLOWED_INPUT_FORMATS.join(", ")}` });
   }
 
-  const targetFormat = (req.body.targetFormat || "").toLowerCase();
+  const targetFormat = normalizeFormat(req.body.targetFormat || "");
   if (!ALLOWED_OUTPUT_FORMATS.includes(targetFormat)) {
     fs.unlinkSync(req.file.path);
     return res.status(400).json({ error: `Unsupported target format: ${targetFormat}. Allowed: ${ALLOWED_OUTPUT_FORMATS.join(", ")}` });
