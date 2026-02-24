@@ -10,7 +10,9 @@
       "Bash(ping:*)",
       "Bash(del:*)",
       "Bash(del /q \"D:\\\\Cursor\\\\down\\\\backend\\\\uploads\\\\*\")",
-      "Bash(del /q \"D:\\\\Cursor\\\\down\\\\backend\\\\converted\\\\*\")"
+      "Bash(del /q \"D:\\\\Cursor\\\\down\\\\backend\\\\converted\\\\*\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nSwitch to Supabase and configure Vercel deployment\n\n- Replace better-sqlite3 with @supabase/supabase-js in db.js\n- Add vercel.json with routes for API and static frontend\n- Add api/index.js serverless function entry point\n- Export Express app from server.js, skip listen on Vercel\n- Use /tmp for file uploads on Vercel serverless\n- Fix frontend api.js to use relative URLs \\(window.location.origin\\)\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)"
     ]
   }
 }

@@ -16,6 +16,10 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 const ALLOWED_INPUT_FORMATS = ["pdf", "docx", "txt"];
 const ALLOWED_OUTPUT_FORMATS = ["pdf", "docx", "txt"];
 const ALLOWED_PRESETS = ["resume-safe", "print-safe", "mobile-safe"];
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Use /tmp on Vercel (serverless), local dirs otherwise
 const IS_VERCEL = !!process.env.VERCEL;
@@ -23,7 +27,17 @@ const uploadsDir = IS_VERCEL ? "/tmp/uploads" : path.join(__dirname, "uploads");
 const convertedDir = IS_VERCEL ? "/tmp/converted" : path.join(__dirname, "converted");
 
 // -- Middleware --
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || CORS_ORIGINS.length === 0 || CORS_ORIGINS.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+  })
+);
 app.use(express.json());
 
 // -- Ensure dirs exist --

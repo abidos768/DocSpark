@@ -1,4 +1,36 @@
-const API_BASE_URL = window.location.origin;
+function resolveApiBaseUrl() {
+  const fromGlobal = window.DOCSPARK_API_BASE_URL;
+  if (typeof fromGlobal === "string" && fromGlobal.trim()) {
+    return fromGlobal.trim().replace(/\/+$/, "");
+  }
+
+  const fromStorage = window.localStorage.getItem("docspark-api-base-url");
+  if (typeof fromStorage === "string" && fromStorage.trim()) {
+    return fromStorage.trim().replace(/\/+$/, "");
+  }
+
+  const fromMeta = document.querySelector('meta[name="docspark-api-base-url"]')?.content;
+  if (typeof fromMeta === "string" && fromMeta.trim()) {
+    return fromMeta.trim().replace(/\/+$/, "");
+  }
+
+  return window.location.origin;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
+
+async function parseError(response, fallbackPrefix) {
+  let details = "";
+  try {
+    const data = await response.json();
+    if (data?.error) {
+      details = `: ${data.error}`;
+    }
+  } catch {
+    // ignore json parse errors
+  }
+  return `${fallbackPrefix} ${response.status}${details}`;
+}
 
 export async function createConversionJob(formData) {
   const response = await fetch(`${API_BASE_URL}/api/convert`, {
@@ -7,7 +39,7 @@ export async function createConversionJob(formData) {
   });
 
   if (!response.ok) {
-    throw new Error(`Convert request failed with status ${response.status}`);
+    throw new Error(await parseError(response, "Convert request failed with status"));
   }
 
   return response.json();
@@ -16,7 +48,7 @@ export async function createConversionJob(formData) {
 export async function getJobStatus(jobId) {
   const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`);
   if (!response.ok) {
-    throw new Error(`Status request failed with status ${response.status}`);
+    throw new Error(await parseError(response, "Status request failed with status"));
   }
   return response.json();
 }
@@ -24,7 +56,7 @@ export async function getJobStatus(jobId) {
 export async function getJobInsights(jobId) {
   const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/insights`);
   if (!response.ok) {
-    throw new Error(`Insights request failed with status ${response.status}`);
+    throw new Error(await parseError(response, "Insights request failed with status"));
   }
   return response.json();
 }
@@ -38,7 +70,7 @@ export async function deleteJob(jobId) {
     method: "DELETE",
   });
   if (!response.ok) {
-    throw new Error(`Delete request failed with status ${response.status}`);
+    throw new Error(await parseError(response, "Delete request failed with status"));
   }
   return response.json();
 }

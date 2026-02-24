@@ -80,52 +80,77 @@ function renderHome() {
 
 function renderConvert() {
   return `
-    <section class="contact">
-      <h1 class="section-title">Converter</h1>
-      <p>Choose format and mode. Analysis features are optional and consent-based.</p>
-      <form id="convert-form" class="form-grid" novalidate>
-        <label>
-          File
-          <input id="file" name="file" type="file" />
-          <small class="error" id="file-error"></small>
-        </label>
+    <section class="convert-page">
+      <div class="convert-intro">
+        <h1 class="section-title">Converter</h1>
+        <p>Fast conversion by default, with optional Smart Output Pack only when you opt in.</p>
+      </div>
 
-        <label>
-          Target Format
-          <select id="targetFormat" name="targetFormat">
-            <option value="pdf">PDF</option>
-            <option value="docx">DOCX</option>
-            <option value="txt">TXT</option>
-          </select>
-        </label>
+      <div class="convert-layout">
+        <form id="convert-form" class="form-grid convert-form" novalidate>
+          <div class="field-stack">
+            <label>
+              File
+              <input id="file" name="file" type="file" />
+              <small class="error" id="file-error"></small>
+            </label>
+          </div>
 
-        <label>
-          Preset
-          <select id="preset" name="preset">
-            <option value="">None</option>
-            <option value="resume-safe">Resume-safe</option>
-            <option value="print-safe">Print-safe</option>
-            <option value="mobile-safe">Mobile-safe</option>
-          </select>
-        </label>
+          <div class="field-row">
+            <label>
+              Target Format
+              <select id="targetFormat" name="targetFormat">
+                <option value="pdf">PDF</option>
+                <option value="docx">DOCX</option>
+                <option value="txt">TXT</option>
+              </select>
+            </label>
 
-        <label>
-          Processing Mode
-          <select id="analysisMode" name="analysisMode">
-            <option value="convert_only">Convert only (default)</option>
-            <option value="convert_plus_insights">Convert + Smart Output Pack</option>
-          </select>
-        </label>
+            <label>
+              Preset
+              <select id="preset" name="preset">
+                <option value="">None</option>
+                <option value="resume-safe">Resume-safe</option>
+                <option value="print-safe">Print-safe</option>
+                <option value="mobile-safe">Mobile-safe</option>
+              </select>
+            </label>
+          </div>
 
-        <label class="consent-row">
-          <input id="analysisConsent" name="analysisConsent" type="checkbox" />
-          I agree to process this file for optional insights.
-        </label>
-        <small class="error" id="consent-error"></small>
+          <div class="field-stack">
+            <label>
+              Processing Mode
+              <select id="analysisMode" name="analysisMode">
+                <option value="convert_only">Convert only (default)</option>
+                <option value="convert_plus_insights">Convert + Smart Output Pack</option>
+              </select>
+            </label>
+          </div>
 
-        <button class="btn btn-primary" type="submit">Start Conversion</button>
-        <p class="success" id="convert-success"></p>
-      </form>
+          <div class="consent-block">
+            <label class="consent-row">
+              <input id="analysisConsent" name="analysisConsent" type="checkbox" />
+              I agree to process this file for optional insights.
+            </label>
+            <small class="error" id="consent-error"></small>
+          </div>
+
+          <button class="btn btn-primary" type="submit">Start Conversion</button>
+          <p class="success" id="convert-success"></p>
+        </form>
+
+        <aside class="convert-sidepanel">
+          <h3>What happens next</h3>
+          <ul>
+            <li>Upload and queue starts immediately</li>
+            <li>Live progress updates during processing</li>
+            <li>One-click download when conversion completes</li>
+          </ul>
+          <div class="convert-note">
+            <strong>Privacy default:</strong> analysis is disabled unless you explicitly choose Smart Output Pack and provide consent.
+          </div>
+        </aside>
+      </div>
     </section>
   `;
 }
