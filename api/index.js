@@ -4,8 +4,8 @@ const { v4: uuidv4 } = require("uuid");
 const db = require("../backend/db");
 const { processJob } = require("../backend/converter");
 
-const ALLOWED_INPUT = ["pdf", "docx", "txt"];
-const ALLOWED_OUTPUT = ["pdf", "docx", "txt"];
+const ALLOWED_INPUT = ["pdf", "docx", "txt", "html", "htm", "md", "rtf", "csv"];
+const ALLOWED_OUTPUT = ["pdf", "docx", "txt", "html", "md", "rtf", "csv"];
 const ALLOWED_PRESETS = ["resume-safe", "print-safe", "mobile-safe"];
 const TTL_MINUTES = 30;
 const MAX_SIZE = 250 * 1024 * 1024;
@@ -103,7 +103,8 @@ async function handleConvert(req, res) {
     }
   }
 
-  const ext = (filePart.filename.split(".").pop() || "").toLowerCase();
+  let ext = (filePart.filename.split(".").pop() || "").toLowerCase();
+  if (ext === "htm") ext = "html";
   if (!ALLOWED_INPUT.includes(ext)) {
     return res.status(400).json({ error: `Unsupported input: ${ext}` });
   }
