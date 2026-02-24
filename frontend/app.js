@@ -1,5 +1,6 @@
 import {
   createConversionJob,
+  createPdfFromHtml,
   getJobStatus,
   getJobInsights,
   getJobDownloadUrl,
@@ -22,6 +23,31 @@ const routes = {
   "/pricing": renderPricing,
   "/privacy": renderPrivacy,
 };
+
+function normalizeFileExt(ext) {
+  const value = String(ext || "").trim().toLowerCase();
+  if (value === "htm") return "html";
+  if (value === "markdown") return "md";
+  return value;
+}
+
+function getSourceExtFromName(filename) {
+  const name = String(filename || "");
+  const parts = name.split(".");
+  if (parts.length < 2) return "";
+  return normalizeFileExt(parts.pop());
+}
+
+function isGuaranteedPair(sourceExt, targetExt) {
+  if (!sourceExt || !targetExt) return true;
+  if (sourceExt === targetExt) return true;
+  const textFamily = new Set(["txt", "md", "csv"]);
+  if (textFamily.has(sourceExt) && textFamily.has(targetExt)) return true;
+  if (sourceExt === "html" && targetExt === "txt") return true;
+  if (sourceExt === "txt" && targetExt === "html") return true;
+  if (targetExt === "pdf" && ["html", "txt", "md"].includes(sourceExt)) return true;
+  return false;
+}
 
 window.addEventListener("hashchange", renderRoute);
 window.addEventListener("DOMContentLoaded", () => {
@@ -95,6 +121,30 @@ function renderHome() {
         <h3>Transparent Results</h3>
         <p>Completion view now explains exactly which settings were applied to your file.</p>
       </div>
+
+      <section class="html-pdf-panel">
+        <h2>Direct HTML to PDF</h2>
+        <p>Paste raw HTML and generate a PDF directly, without uploading a file.</p>
+        <form id="html-pdf-form" class="form-grid" novalidate>
+          <div class="field-row">
+            <label>
+              Output Filename
+              <input id="html-pdf-filename" name="filename" type="text" value="document" placeholder="document" />
+            </label>
+          </div>
+          <label>
+            HTML Content
+            <textarea
+              id="html-pdf-content"
+              name="htmlContent"
+              placeholder="<!doctype html><html><body><h1>Hello</h1></body></html>"
+            ></textarea>
+          </label>
+          <small class="error" id="html-pdf-error"></small>
+          <p class="success" id="html-pdf-success"></p>
+          <button class="btn btn-primary" type="submit">Generate PDF from HTML</button>
+        </form>
+      </section>
     </section>
   `;
 }
@@ -298,9 +348,11 @@ function bindEvents(path) {
   }
 
   const form = document.getElementById("convert-form");
+  const htmlPdfForm = document.getElementById("html-pdf-form");
   setupConvertFormUx();
   setupChallengeWidget();
   form?.addEventListener("submit", onConvertSubmit);
+  htmlPdfForm?.addEventListener("submit", onHtmlPdfSubmit);
 }
 
 function resolveChallengeSiteKey() {
@@ -438,30 +490,9 @@ function setupConvertFormUx() {
     syncFormatCompatibility();
   };
 
-  const getSourceExt = () => {
-    const name = fileInput?.files?.[0]?.name || "";
-    const parts = name.split(".");
-    if (parts.length < 2) return "";
-    const ext = parts.pop().toLowerCase();
-    if (ext === "htm") return "html";
-    if (ext === "markdown") return "md";
-    return ext;
-  };
-
-  const isGuaranteedPair = (sourceExt, targetExt) => {
-    if (!sourceExt || !targetExt) return true;
-    if (sourceExt === targetExt) return true;
-    const textFamily = new Set(["txt", "md", "csv"]);
-    if (textFamily.has(sourceExt) && textFamily.has(targetExt)) return true;
-    if (sourceExt === "html" && targetExt === "txt") return true;
-    if (sourceExt === "txt" && targetExt === "html") return true;
-    if (targetExt === "pdf" && ["html", "txt", "md"].includes(sourceExt)) return true;
-    return false;
-  };
-
   const syncFormatCompatibility = () => {
     if (!formatWarning) return;
-    const sourceExt = getSourceExt();
+    const sourceExt = getSourceExtFromName(fileInput?.files?.[0]?.name || "");
     const targetExt = targetSelect?.value || "";
     if (!sourceExt || !targetExt) {
       formatWarning.textContent = "";
@@ -561,6 +592,10 @@ async function onConvertSubmit(event) {
   if (!file) {
     errors.file = "Please choose a file.";
   }
+  const sourceExt = getSourceExtFromName(file?.name || "");
+  if (file && !isGuaranteedPair(sourceExt, targetFormat)) {
+    errors.file = "This format pair is not supported in the current deployment. Choose another pair.";
+  }
   if (mode === "convert_plus_insights" && !consent) {
     errors.consent = "Consent is required to enable Smart Output Pack.";
   }
@@ -630,6 +665,57 @@ async function onConvertSubmit(event) {
     }
     submitBtn.disabled = false;
     submitBtn.textContent = "Start Conversion";
+  }
+}
+
+async function onHtmlPdfSubmit(event) {
+  event.preventDefault();
+
+  const htmlInput = document.getElementById("html-pdf-content");
+  const filenameInput = document.getElementById("html-pdf-filename");
+  const errorEl = document.getElementById("html-pdf-error");
+  const successEl = document.getElementById("html-pdf-success");
+  const submitBtn = event.target.querySelector("button[type=submit]");
+
+  if (errorEl) errorEl.textContent = "";
+  if (successEl) {
+    successEl.textContent = "";
+    successEl.style.color = "";
+  }
+
+  const html = htmlInput?.value || "";
+  const filename = (filenameInput?.value || "document").trim();
+
+  if (!html.trim()) {
+    if (errorEl) errorEl.textContent = "Please paste HTML content.";
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Generating...";
+
+  try {
+    const pdfBlob = await createPdfFromHtml(html, filename || "document");
+    const objectUrl = URL.createObjectURL(pdfBlob);
+    const downloadLink = document.createElement("a");
+    const safeName = (filename || "document").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "document";
+    downloadLink.href = objectUrl;
+    downloadLink.download = `${safeName}.pdf`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(objectUrl);
+
+    if (successEl) {
+      successEl.textContent = "PDF generated and downloaded.";
+    }
+  } catch (error) {
+    if (errorEl) {
+      errorEl.textContent = error.message || "Failed to generate PDF.";
+    }
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Generate PDF from HTML";
   }
 }
 

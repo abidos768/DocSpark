@@ -84,4 +84,20 @@ export async function deleteJob(jobId) {
   return response.json();
 }
 
+export async function createPdfFromHtml(html, filename = "document") {
+  const response = await fetch(`${API_BASE_URL}/api/html-to-pdf`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ html, filename }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "HTML to PDF request failed with status"));
+  }
+
+  return response.blob();
+}
+
 export { API_BASE_URL };

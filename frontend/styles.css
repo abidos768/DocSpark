@@ -381,6 +381,32 @@ body {
   color: var(--ink-soft);
 }
 
+.html-pdf-panel {
+  margin-top: 1rem;
+  background: var(--surface-glass);
+  border: 1px solid var(--line-strong);
+  border-radius: 1rem;
+  padding: 1.1rem;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.html-pdf-panel h2 {
+  margin: 0;
+  font-family: Fraunces, Georgia, serif;
+}
+
+.html-pdf-panel p {
+  margin: 0.4rem 0 0.8rem;
+  color: var(--ink-soft);
+}
+
+#html-pdf-content {
+  min-height: 12rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
 .form-grid {
   display: grid;
   gap: 0.8rem;
