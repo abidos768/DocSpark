@@ -14,7 +14,13 @@ function resolveApiBaseUrl() {
     return fromMeta.trim().replace(/\/+$/, "");
   }
 
-  return window.location.origin;
+  // On Vercel, frontend and API share the same origin
+  // Locally, backend runs on port 3000
+  const loc = window.location;
+  if (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") {
+    return `${loc.protocol}//${loc.hostname}:3000`;
+  }
+  return loc.origin;
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
