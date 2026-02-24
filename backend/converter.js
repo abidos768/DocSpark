@@ -13,20 +13,19 @@ async function processJob(job) {
   try {
     await db.updateJobStatus(job.id, "processing", 10);
 
-    // Simulate conversion delay (1-3 seconds)
-    await delay(1000);
-    await db.updateJobStatus(job.id, "processing", 40);
-
-    await delay(500);
-    await db.updateJobStatus(job.id, "processing", 70);
+    // Simulate conversion delay only when running locally (Vercel has 10s timeout)
+    if (!IS_VERCEL) {
+      await delay(1000);
+      await db.updateJobStatus(job.id, "processing", 40);
+      await delay(500);
+      await db.updateJobStatus(job.id, "processing", 70);
+    }
 
     // Copy uploaded file as the "converted" output (mock conversion)
     const ext = job.target_format.toLowerCase();
     const outName = `${job.id}.${ext}`;
     const outPath = path.join(CONVERTED_DIR, outName);
     fs.copyFileSync(job.original_path, outPath);
-
-    await db.updateJobStatus(job.id, "processing", 90);
 
     // Generate insights if opted in
     if (job.analysis_mode === "convert_plus_insights" && job.analysis_consent === 1) {
