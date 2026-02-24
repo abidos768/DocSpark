@@ -69,7 +69,7 @@ module.exports = async (req, res) => {
     return res.status(404).json({ error: "Not found" });
   } catch (err) {
     console.error("API error:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error", debug: err.message });
   }
 };
 
