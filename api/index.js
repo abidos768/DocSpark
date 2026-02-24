@@ -10,6 +10,21 @@ const ALLOWED_PRESETS = ["resume-safe", "print-safe", "mobile-safe"];
 const TTL_MINUTES = 30;
 const MAX_SIZE = 250 * 1024 * 1024;
 
+function toPublicFailureMessage(reason) {
+  const text = String(reason || "");
+  if (!text) return "Conversion could not be completed. Please try another format pair.";
+  if (text.includes("Unsupported conversion")) return "This format pair is not available right now.";
+  if (
+    text.includes("serverless_pdf_failed") ||
+    text.includes("pandoc_not_installed") ||
+    text.includes("soffice_not_installed") ||
+    text.includes("No conversion engine available")
+  ) {
+    return "This conversion is temporarily unavailable. Please try a different format pair.";
+  }
+  return "Conversion failed. Please try again.";
+}
+
 module.exports = async (req, res) => {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -39,7 +54,7 @@ module.exports = async (req, res) => {
         jobId: job.id,
         status: job.status,
         progress: job.progress,
-        failureReason: job.failure_reason || "",
+        failureReason: toPublicFailureMessage(job.failure_reason),
       });
     }
 
@@ -74,7 +89,7 @@ module.exports = async (req, res) => {
     return res.status(404).json({ error: "Not found" });
   } catch (err) {
     console.error("API error:", err);
-    return res.status(500).json({ error: "Internal server error", debug: err.message });
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -165,7 +180,7 @@ async function handleConvert(req, res) {
   const completed = await db.getJob(job.id);
   if (completed.status !== "done") {
     return res.status(422).json({
-      error: completed.failure_reason || "Requested conversion is not supported by the current converter.",
+      error: toPublicFailureMessage(completed.failure_reason),
       jobId: completed.id,
       status: completed.status,
     });
