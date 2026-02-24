@@ -365,6 +365,49 @@ body {
   font-weight: 600;
 }
 
+.sr-only-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.dropzone {
+  border: 1px dashed color-mix(in srgb, var(--line) 55%, var(--brand));
+  border-radius: 0.8rem;
+  padding: 1rem 0.9rem;
+  background: color-mix(in srgb, var(--surface-solid) 74%, transparent);
+  cursor: pointer;
+  transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.dropzone:hover,
+.dropzone.is-dragging {
+  border-color: var(--brand);
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--brand) 10%, var(--surface-solid));
+}
+
+.dropzone.has-file {
+  border-style: solid;
+}
+
+.dropzone-title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.dropzone-subtitle {
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
 .field-hint {
   color: var(--ink-soft);
   font-size: 0.82rem;
@@ -417,13 +460,39 @@ body {
   transform: translateY(-1px);
 }
 
+.config-block {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  padding: 0.85rem;
+  background: color-mix(in srgb, var(--surface-solid) 70%, transparent);
+}
+
+.config-block h3 {
+  margin: 0 0 0.7rem;
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.05rem;
+}
+
+.inline-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-top: 1.7rem;
+}
+
 .form-grid input:focus,
 .form-grid textarea:focus,
 .form-grid select:focus,
 .btn:focus,
-.theme-toggle:focus {
+.theme-toggle:focus,
+.dropzone:focus {
   outline: 2px solid var(--brand);
   outline-offset: 1px;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .form-grid textarea {
@@ -540,6 +609,10 @@ body {
 
   .field-row {
     grid-template-columns: 1fr;
+  }
+
+  .inline-toggle {
+    padding-top: 0.2rem;
   }
 
   .header-actions {

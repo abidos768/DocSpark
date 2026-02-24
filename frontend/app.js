@@ -91,7 +91,11 @@ function renderConvert() {
           <div class="field-stack">
             <label>
               File
-              <input id="file" name="file" type="file" />
+              <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Drop a file or browse">
+                <p class="dropzone-title">Drop your file here</p>
+                <p class="dropzone-subtitle">or click to browse</p>
+              </div>
+              <input id="file" name="file" type="file" class="sr-only-file" />
               <small class="field-hint">Supports PDF, DOCX, TXT up to 25MB.</small>
               <small class="file-pill" id="file-pill">No file selected</small>
               <small class="error" id="file-error"></small>
@@ -128,6 +132,34 @@ function renderConvert() {
               </select>
             </label>
           </div>
+
+          <section class="config-block">
+            <h3>Document Configuration</h3>
+            <div class="field-row">
+              <label>
+                Output Name (optional)
+                <input id="outputName" name="outputName" type="text" placeholder="e.g. final-report" />
+              </label>
+              <label>
+                Optimize For
+                <select id="optimizeFor" name="optimizeFor">
+                  <option value="balanced">Balanced</option>
+                  <option value="small_size">Small file size</option>
+                  <option value="high_quality">High quality</option>
+                </select>
+              </label>
+            </div>
+            <div class="field-row">
+              <label>
+                Page Range (optional)
+                <input id="pageRange" name="pageRange" type="text" placeholder="e.g. 1-3,5" />
+              </label>
+              <label class="inline-toggle">
+                <input id="retainMetadata" name="retainMetadata" type="checkbox" />
+                Keep original metadata
+              </label>
+            </div>
+          </section>
 
           <div class="consent-block">
             <label class="consent-row">
@@ -200,11 +232,13 @@ function bindEvents(path) {
 
 function setupConvertFormUx() {
   const fileInput = document.getElementById("file");
+  const dropzone = document.getElementById("dropzone");
   const modeSelect = document.getElementById("analysisMode");
   const consentInput = document.getElementById("analysisConsent");
   const consentBlock = document.querySelector(".consent-block");
   const consentHint = document.getElementById("consent-hint");
   const filePill = document.getElementById("file-pill");
+  const submitBtn = document.querySelector("#convert-form button[type=submit]");
 
   const syncModeState = () => {
     const insightsMode = modeSelect?.value === "convert_plus_insights";
@@ -230,7 +264,42 @@ function setupConvertFormUx() {
     if (filePill) {
       filePill.textContent = file ? `${file.name} (${Math.ceil(file.size / 1024)} KB)` : "No file selected";
     }
+    if (dropzone) {
+      dropzone.classList.toggle("has-file", Boolean(file));
+    }
+    if (submitBtn) {
+      submitBtn.disabled = !file;
+    }
   };
+
+  const applyDroppedFile = (file) => {
+    if (!file || !fileInput) return;
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    fileInput.files = transfer.files;
+    syncFileState();
+  };
+
+  dropzone?.addEventListener("click", () => fileInput?.click());
+  dropzone?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      fileInput?.click();
+    }
+  });
+  dropzone?.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    dropzone.classList.add("is-dragging");
+  });
+  dropzone?.addEventListener("dragleave", () => {
+    dropzone.classList.remove("is-dragging");
+  });
+  dropzone?.addEventListener("drop", (event) => {
+    event.preventDefault();
+    dropzone.classList.remove("is-dragging");
+    const dropped = event.dataTransfer?.files?.[0];
+    applyDroppedFile(dropped);
+  });
 
   modeSelect?.addEventListener("change", syncModeState);
   fileInput?.addEventListener("change", syncFileState);
@@ -269,6 +338,10 @@ async function onConvertSubmit(event) {
   const consent = document.getElementById("analysisConsent").checked;
   const preset = document.getElementById("preset").value;
   const targetFormat = document.getElementById("targetFormat").value;
+  const outputName = document.getElementById("outputName")?.value?.trim();
+  const optimizeFor = document.getElementById("optimizeFor")?.value;
+  const pageRange = document.getElementById("pageRange")?.value?.trim();
+  const retainMetadata = document.getElementById("retainMetadata")?.checked;
   const file = fileInput?.files?.[0];
 
   const errors = {};
@@ -290,6 +363,14 @@ async function onConvertSubmit(event) {
   if (preset) {
     formData.append("preset", preset);
   }
+  if (outputName) {
+    formData.append("outputName", outputName);
+  }
+  if (pageRange) {
+    formData.append("pageRange", pageRange);
+  }
+  formData.append("optimizeFor", optimizeFor || "balanced");
+  formData.append("retainMetadata", retainMetadata ? "true" : "false");
   formData.append("analysisMode", mode);
   if (mode === "convert_plus_insights") {
     formData.append("analysisConsent", "true");
