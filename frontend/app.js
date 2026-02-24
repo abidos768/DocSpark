@@ -455,6 +455,7 @@ function setupConvertFormUx() {
     if (textFamily.has(sourceExt) && textFamily.has(targetExt)) return true;
     if (sourceExt === "html" && targetExt === "txt") return true;
     if (sourceExt === "txt" && targetExt === "html") return true;
+    if (targetExt === "pdf" && ["html", "txt", "md"].includes(sourceExt)) return true;
     return false;
   };
 

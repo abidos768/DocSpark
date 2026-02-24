@@ -107,6 +107,11 @@ async function convertFile(inputPath, outputPath, sourceExt, targetExt) {
     return;
   }
 
+  const serverlessPdfError = await tryServerlessPdf(inputPath, outputPath, sourceExt, targetExt);
+  if (!serverlessPdfError && fs.existsSync(outputPath)) {
+    return;
+  }
+
   const pandocError = await tryPandoc(inputPath, outputPath);
   if (!pandocError && fs.existsSync(outputPath)) {
     return;
@@ -117,8 +122,64 @@ async function convertFile(inputPath, outputPath, sourceExt, targetExt) {
     return;
   }
 
-  const reasons = [pandocError, sofficeError].filter(Boolean).join(" | ");
+  const reasons = [serverlessPdfError, pandocError, sofficeError].filter(Boolean).join(" | ");
   throw new Error(`Unsupported conversion: ${sourceExt} -> ${targetExt}. ${reasons || "No conversion engine available."}`);
+}
+
+async function tryServerlessPdf(inputPath, outputPath, sourceExt, targetExt) {
+  if (targetExt !== "pdf") return "serverless_pdf_not_target";
+  if (!["html", "txt", "md"].includes(sourceExt)) return "serverless_pdf_source_unsupported";
+
+  let chromium;
+  let puppeteer;
+  try {
+    chromium = require("@sparticuz/chromium");
+    puppeteer = require("puppeteer-core");
+  } catch {
+    return "serverless_pdf_runtime_missing";
+  }
+
+  let htmlContent = "";
+  if (sourceExt === "html") {
+    htmlContent = fs.readFileSync(inputPath, "utf8");
+  } else {
+    const text = fs.readFileSync(inputPath, "utf8");
+    const escaped = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    htmlContent = `<!doctype html><html><body><pre>${escaped}</pre></body></html>`;
+  }
+
+  let browser;
+  try {
+    const executablePath = await chromium.executablePath();
+    browser = await puppeteer.launch({
+      args: chromium.args,
+      executablePath,
+      headless: chromium.headless,
+      defaultViewport: { width: 1280, height: 720 },
+    });
+    const page = await browser.newPage();
+    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+    await page.pdf({
+      path: outputPath,
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: true,
+    });
+    return null;
+  } catch (error) {
+    return `serverless_pdf_failed:${error.message}`;
+  } finally {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch {
+        // ignore close errors
+      }
+    }
+  }
 }
 
 async function tryPandoc(inputPath, outputPath) {
