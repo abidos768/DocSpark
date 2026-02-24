@@ -480,6 +480,23 @@ body {
   padding-top: 1.7rem;
 }
 
+.challenge-block {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  padding: 0.75rem 0.8rem;
+  background: color-mix(in srgb, var(--surface-solid) 70%, transparent);
+  display: grid;
+  gap: 0.4rem;
+}
+
+.challenge-block.is-hidden {
+  display: none;
+}
+
+#challenge-widget {
+  min-height: 66px;
+}
+
 .form-grid input:focus,
 .form-grid textarea:focus,
 .form-grid select:focus,

@@ -8,6 +8,13 @@ import {
 
 const app = document.getElementById("app");
 const THEME_STORAGE_KEY = "docspark-theme";
+const CHALLENGE_KEY_STORAGE = "docspark-turnstile-site-key";
+const challengeState = {
+  siteKey: null,
+  token: "",
+  widgetId: null,
+  scriptPromise: null,
+};
 
 const routes = {
   "/": renderHome,
@@ -170,6 +177,13 @@ function renderConvert() {
             <small class="error" id="consent-error"></small>
           </div>
 
+          <div class="challenge-block" id="challenge-block">
+            <label>Verification</label>
+            <div id="challenge-widget"></div>
+            <small class="field-hint" id="challenge-hint">Complete the human verification to prevent spam.</small>
+            <small class="error" id="challenge-error"></small>
+          </div>
+
           <button class="btn btn-primary" type="submit">Start Conversion</button>
           <p class="success" id="convert-success"></p>
         </form>
@@ -227,7 +241,95 @@ function bindEvents(path) {
 
   const form = document.getElementById("convert-form");
   setupConvertFormUx();
+  setupChallengeWidget();
   form?.addEventListener("submit", onConvertSubmit);
+}
+
+function resolveChallengeSiteKey() {
+  const fromGlobal = window.DOCSPARK_TURNSTILE_SITE_KEY;
+  if (typeof fromGlobal === "string" && fromGlobal.trim()) {
+    return fromGlobal.trim();
+  }
+  const fromStorage = window.localStorage.getItem(CHALLENGE_KEY_STORAGE);
+  if (typeof fromStorage === "string" && fromStorage.trim()) {
+    return fromStorage.trim();
+  }
+  const fromMeta = document.querySelector('meta[name="docspark-turnstile-site-key"]')?.content;
+  if (typeof fromMeta === "string" && fromMeta.trim()) {
+    return fromMeta.trim();
+  }
+  return "";
+}
+
+function loadTurnstileScript() {
+  if (window.turnstile) {
+    return Promise.resolve();
+  }
+  if (challengeState.scriptPromise) {
+    return challengeState.scriptPromise;
+  }
+  challengeState.scriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Unable to load verification widget."));
+    document.head.appendChild(script);
+  });
+  return challengeState.scriptPromise;
+}
+
+function setupChallengeWidget() {
+  const block = document.getElementById("challenge-block");
+  const hint = document.getElementById("challenge-hint");
+  const widget = document.getElementById("challenge-widget");
+
+  challengeState.siteKey = resolveChallengeSiteKey();
+  challengeState.token = "";
+  challengeState.widgetId = null;
+
+  if (!block || !widget) return;
+  if (!challengeState.siteKey) {
+    block.classList.add("is-hidden");
+    return;
+  }
+
+  block.classList.remove("is-hidden");
+  widget.innerHTML = "";
+
+  loadTurnstileScript()
+    .then(() => {
+      if (!window.turnstile || challengeState.widgetId !== null) {
+        return;
+      }
+      challengeState.widgetId = window.turnstile.render(widget, {
+        sitekey: challengeState.siteKey,
+        callback: (token) => {
+          challengeState.token = token;
+          const challengeError = document.getElementById("challenge-error");
+          if (challengeError) challengeError.textContent = "";
+        },
+        "expired-callback": () => {
+          challengeState.token = "";
+        },
+        "error-callback": () => {
+          challengeState.token = "";
+        },
+      });
+    })
+    .catch(() => {
+      if (hint) {
+        hint.textContent = "Verification widget failed to load. Refresh and try again.";
+      }
+    });
+}
+
+function resetChallengeWidget() {
+  challengeState.token = "";
+  if (window.turnstile && challengeState.widgetId !== null) {
+    window.turnstile.reset(challengeState.widgetId);
+  }
 }
 
 function setupConvertFormUx() {
@@ -351,6 +453,9 @@ async function onConvertSubmit(event) {
   if (mode === "convert_plus_insights" && !consent) {
     errors.consent = "Consent is required to enable Smart Output Pack.";
   }
+  if (challengeState.siteKey && !challengeState.token) {
+    errors.challenge = "Please complete verification.";
+  }
 
   if (Object.keys(errors).length) {
     showErrors(errors);
@@ -372,6 +477,9 @@ async function onConvertSubmit(event) {
   formData.append("optimizeFor", optimizeFor || "balanced");
   formData.append("retainMetadata", retainMetadata ? "true" : "false");
   formData.append("analysisMode", mode);
+  if (challengeState.token) {
+    formData.append("challengeToken", challengeState.token);
+  }
   if (mode === "convert_plus_insights") {
     formData.append("analysisConsent", "true");
   }
@@ -397,6 +505,9 @@ async function onConvertSubmit(event) {
     success.textContent = error.message || "Could not reach backend.";
     success.style.color = "var(--error)";
   } finally {
+    if (challengeState.siteKey) {
+      resetChallengeWidget();
+    }
     submitBtn.disabled = false;
     submitBtn.textContent = "Start Conversion";
   }
@@ -494,10 +605,13 @@ function showErrors(errors) {
   if (errors.consent) {
     document.getElementById("consent-error").textContent = errors.consent;
   }
+  if (errors.challenge) {
+    document.getElementById("challenge-error").textContent = errors.challenge;
+  }
 }
 
 function clearErrors() {
-  ["file-error", "consent-error"].forEach((id) => {
+  ["file-error", "consent-error", "challenge-error"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) {
       el.textContent = "";
