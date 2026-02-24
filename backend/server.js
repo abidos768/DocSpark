@@ -351,7 +351,7 @@ app.post("/api/convert", convertLimiter, limitActiveConversions, upload.single("
     const completed = await db.getJob(job.id);
     if (completed.status !== "done") {
       return res.status(422).json({
-        error: "Requested conversion is not supported by the current converter.",
+        error: completed.failure_reason || "Requested conversion is not supported by the current converter.",
         jobId: completed.id,
         status: completed.status,
       });
@@ -371,7 +371,12 @@ app.get("/api/jobs/:id", readLimiter, async (req, res) => {
   if (!job) {
     return res.status(404).json({ error: "Job not found" });
   }
-  res.json({ jobId: job.id, status: job.status, progress: job.progress });
+  res.json({
+    jobId: job.id,
+    status: job.status,
+    progress: job.progress,
+    failureReason: job.failure_reason || "",
+  });
 });
 
 // =============================================

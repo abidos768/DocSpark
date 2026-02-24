@@ -621,6 +621,16 @@ body {
   margin-top: 0.25rem;
 }
 
+.warning {
+  color: #b7791f;
+  font-size: 0.84rem;
+  margin-top: 0.2rem;
+}
+
+:root[data-theme="dark"] .warning {
+  color: #fbbf24;
+}
+
 .success {
   color: var(--success);
   font-weight: 700;

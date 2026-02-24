@@ -136,6 +136,7 @@ function renderConvert() {
                 <option value="rtf">RTF</option>
                 <option value="csv">CSV</option>
               </select>
+              <small class="warning" id="format-warning"></small>
             </label>
 
             <label>
@@ -392,6 +393,8 @@ function resetChallengeWidget() {
 function setupConvertFormUx() {
   const fileInput = document.getElementById("file");
   const dropzone = document.getElementById("dropzone");
+  const targetSelect = document.getElementById("targetFormat");
+  const formatWarning = document.getElementById("format-warning");
   const modeSelect = document.getElementById("analysisMode");
   const consentInput = document.getElementById("analysisConsent");
   const consentBlock = document.querySelector(".consent-block");
@@ -432,6 +435,42 @@ function setupConvertFormUx() {
     if (submitBtn) {
       submitBtn.disabled = !file;
     }
+    syncFormatCompatibility();
+  };
+
+  const getSourceExt = () => {
+    const name = fileInput?.files?.[0]?.name || "";
+    const parts = name.split(".");
+    if (parts.length < 2) return "";
+    const ext = parts.pop().toLowerCase();
+    if (ext === "htm") return "html";
+    if (ext === "markdown") return "md";
+    return ext;
+  };
+
+  const isGuaranteedPair = (sourceExt, targetExt) => {
+    if (!sourceExt || !targetExt) return true;
+    if (sourceExt === targetExt) return true;
+    const textFamily = new Set(["txt", "md", "csv"]);
+    if (textFamily.has(sourceExt) && textFamily.has(targetExt)) return true;
+    if (sourceExt === "html" && targetExt === "txt") return true;
+    if (sourceExt === "txt" && targetExt === "html") return true;
+    return false;
+  };
+
+  const syncFormatCompatibility = () => {
+    if (!formatWarning) return;
+    const sourceExt = getSourceExt();
+    const targetExt = targetSelect?.value || "";
+    if (!sourceExt || !targetExt) {
+      formatWarning.textContent = "";
+      return;
+    }
+    if (isGuaranteedPair(sourceExt, targetExt)) {
+      formatWarning.textContent = "";
+      return;
+    }
+    formatWarning.textContent = "This pair may require Pandoc/LibreOffice on backend and can fail if unavailable.";
   };
 
   const applyDroppedFile = (file) => {
@@ -474,8 +513,10 @@ function setupConvertFormUx() {
 
   modeSelect?.addEventListener("change", syncModeState);
   fileInput?.addEventListener("change", syncFileState);
+  targetSelect?.addEventListener("change", syncFormatCompatibility);
   syncModeState();
   syncFileState();
+  syncFormatCompatibility();
 }
 
 function initTheme() {
@@ -576,7 +617,7 @@ async function onConvertSubmit(event) {
         retainMetadata: Boolean(retainMetadata),
       });
     } else {
-      success.textContent = "Job failed. Please try again.";
+      success.textContent = job.failureReason || "Job failed. Please try again.";
       success.style.color = "var(--error)";
     }
   } catch (error) {

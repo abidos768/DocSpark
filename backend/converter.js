@@ -1,7 +1,10 @@
 const fs = require("fs");
 const path = require("path");
+const { promisify } = require("util");
+const { execFile } = require("child_process");
 const db = require("./db");
 
+const runExecFile = promisify(execFile);
 const IS_VERCEL = !!process.env.VERCEL;
 const CONVERTED_DIR = IS_VERCEL ? "/tmp/converted" : path.join(__dirname, "converted");
 
@@ -9,26 +12,31 @@ if (!fs.existsSync(CONVERTED_DIR)) {
   fs.mkdirSync(CONVERTED_DIR, { recursive: true });
 }
 
+function normalizeFormat(format) {
+  const normalized = String(format || "").trim().toLowerCase();
+  if (normalized === "htm") return "html";
+  if (normalized === "markdown") return "md";
+  return normalized;
+}
+
 async function processJob(job) {
   try {
     await db.updateJobStatus(job.id, "processing", 10);
 
-    // Simulate conversion delay only when running locally (Vercel has 10s timeout)
     if (!IS_VERCEL) {
-      await delay(1000);
-      await db.updateJobStatus(job.id, "processing", 40);
-      await delay(500);
-      await db.updateJobStatus(job.id, "processing", 70);
+      await delay(300);
+      await db.updateJobStatus(job.id, "processing", 35);
     }
 
-    const sourceExt = path.extname(job.original_name).replace(".", "").toLowerCase();
-    const targetExt = String(job.target_format || "").toLowerCase();
+    const sourceExt = normalizeFormat(path.extname(job.original_name).replace(".", ""));
+    const targetExt = normalizeFormat(job.target_format || "");
     const outName = `${job.id}.${targetExt}`;
     const outPath = path.join(CONVERTED_DIR, outName);
 
     await convertFile(job.original_path, outPath, sourceExt, targetExt);
 
-    // Generate insights if opted in
+    await db.updateJobStatus(job.id, "processing", 85);
+
     if (job.analysis_mode === "convert_plus_insights" && job.analysis_consent === 1) {
       const insights = generateMockInsights(job.original_name);
       await db.saveInsights(job.id, insights);
@@ -36,8 +44,9 @@ async function processJob(job) {
 
     await db.markJobDone(job.id, outPath);
   } catch (err) {
-    console.error(`Job ${job.id} failed:`, err.message);
-    await db.markJobFailed(job.id);
+    const reason = err?.message || "Conversion failed.";
+    console.error(`Job ${job.id} failed:`, reason);
+    await db.markJobFailed(job.id, reason);
   }
 }
 
@@ -49,13 +58,11 @@ async function convertFile(inputPath, outputPath, sourceExt, targetExt) {
     return;
   }
 
-  // Safe text-family passthroughs only.
   if (passthroughSet.has(sourceExt) && passthroughSet.has(targetExt)) {
     fs.copyFileSync(inputPath, outputPath);
     return;
   }
 
-  // Minimal HTML -> TXT conversion.
   if (sourceExt === "html" && targetExt === "txt") {
     const html = fs.readFileSync(inputPath, "utf8");
     const text = html
@@ -68,7 +75,6 @@ async function convertFile(inputPath, outputPath, sourceExt, targetExt) {
     return;
   }
 
-  // Minimal TXT -> HTML conversion.
   if (sourceExt === "txt" && targetExt === "html") {
     const text = fs.readFileSync(inputPath, "utf8");
     const escaped = text
@@ -80,7 +86,73 @@ async function convertFile(inputPath, outputPath, sourceExt, targetExt) {
     return;
   }
 
-  throw new Error(`Unsupported conversion: ${sourceExt} -> ${targetExt}`);
+  const pandocError = await tryPandoc(inputPath, outputPath);
+  if (!pandocError && fs.existsSync(outputPath)) {
+    return;
+  }
+
+  const sofficeError = await trySoffice(inputPath, outputPath, targetExt);
+  if (!sofficeError && fs.existsSync(outputPath)) {
+    return;
+  }
+
+  const reasons = [pandocError, sofficeError].filter(Boolean).join(" | ");
+  throw new Error(`Unsupported conversion: ${sourceExt} -> ${targetExt}. ${reasons || "No conversion engine available."}`);
+}
+
+async function tryPandoc(inputPath, outputPath) {
+  try {
+    await runExecFile("pandoc", [inputPath, "-o", outputPath], { timeout: 15000 });
+    return null;
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return "pandoc_not_installed";
+    }
+    return `pandoc_failed:${error.message}`;
+  }
+}
+
+function sofficeTarget(targetExt) {
+  const map = {
+    pdf: "pdf",
+    docx: "docx",
+    txt: "txt:Text",
+    html: "html:XHTML Writer File",
+    rtf: "rtf",
+    csv: "csv:Text - txt - csv (StarCalc)",
+  };
+  return map[targetExt] || targetExt;
+}
+
+async function trySoffice(inputPath, outputPath, targetExt) {
+  const outDir = path.dirname(outputPath);
+  try {
+    await runExecFile(
+      "soffice",
+      ["--headless", "--convert-to", sofficeTarget(targetExt), "--outdir", outDir, inputPath],
+      { timeout: 25000 }
+    );
+
+    const convertedName = `${path.basename(inputPath, path.extname(inputPath))}.${targetExt}`;
+    const producedPath = path.join(outDir, convertedName);
+    if (!fs.existsSync(producedPath)) {
+      return "soffice_no_output";
+    }
+    fs.copyFileSync(producedPath, outputPath);
+    if (producedPath !== outputPath) {
+      try {
+        fs.unlinkSync(producedPath);
+      } catch {
+        // ignore cleanup failure
+      }
+    }
+    return null;
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return "soffice_not_installed";
+    }
+    return `soffice_failed:${error.message}`;
+  }
 }
 
 function generateMockInsights(filename) {
