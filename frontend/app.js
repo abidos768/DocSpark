@@ -66,34 +66,34 @@ function renderHome() {
       </aside>
     </section>
     <section>
-      <h2 class="section-title">Why DocSpark feels different</h2>
+      <h2 class="section-title">What DocSpark currently does</h2>
       <div class="cards">
         <article class="card">
-          <h3>Default Simplicity</h3>
-          <p>Upload, convert, download. No extra processing unless requested.</p>
+          <h3>Clear Conversion Flow</h3>
+          <p>Upload, choose target format, then download when done.</p>
         </article>
         <article class="card">
-          <h3>Optional Smart Pack</h3>
-          <p>Summary, key fields, redaction hints, and quality score only with consent.</p>
+          <h3>Optional Analysis</h3>
+          <p>Smart Output Pack is available only when you select it and provide consent.</p>
         </article>
         <article class="card">
-          <h3>Temporary Storage</h3>
-          <p>Auto-delete policy keeps converted files short-lived by design.</p>
+          <h3>Current Limits</h3>
+          <p>Some format pairs are still limited in this version and may return unsupported.</p>
         </article>
       </div>
     </section>
     <section class="mini-band">
       <div class="mini-band-item">
-        <h3>Fast by Design</h3>
-        <p>Most conversions complete in seconds with live status updates.</p>
+        <h3>MVP Status</h3>
+        <p>This is an active build; behavior is improving as backend conversion support expands.</p>
       </div>
       <div class="mini-band-item">
         <h3>Consent by Default</h3>
         <p>Smart Output Pack never runs unless you actively enable it.</p>
       </div>
       <div class="mini-band-item">
-        <h3>Built for Real Work</h3>
-        <p>Presets and configuration options keep output consistent across teams.</p>
+        <h3>Transparent Results</h3>
+        <p>Completion view now explains exactly which settings were applied to your file.</p>
       </div>
     </section>
   `;
@@ -118,6 +118,7 @@ function renderConvert() {
               </div>
               <input id="file" name="file" type="file" class="sr-only-file" />
               <small class="field-hint">Supports PDF, DOCX, TXT, HTML, MD, RTF, CSV up to 250MB.</small>
+              <small class="field-hint">Your file is processed temporarily and auto-deleted after 30 minutes.</small>
               <small class="file-pill" id="file-pill">No file selected</small>
               <small class="error" id="file-error"></small>
             </label>
@@ -192,6 +193,7 @@ function renderConvert() {
               I agree to process this file for optional insights.
             </label>
             <small class="field-hint" id="consent-hint">Enable Smart Output Pack to activate this consent checkbox.</small>
+            <small class="field-hint">If enabled, analysis is used only for this conversion and expires with the job.</small>
             <small class="error" id="consent-error"></small>
           </div>
 
@@ -403,6 +405,9 @@ function setupConvertFormUx() {
       consentInput.disabled = !insightsMode;
       if (!insightsMode) {
         consentInput.checked = false;
+      } else if (!consentInput.checked) {
+        // When user explicitly selects insights mode, pre-enable consent for smoother UX.
+        consentInput.checked = true;
       }
     }
     if (consentBlock) {
@@ -411,7 +416,7 @@ function setupConvertFormUx() {
     }
     if (consentHint) {
       consentHint.textContent = insightsMode
-        ? "Consent is required while Smart Output Pack is enabled."
+        ? "Smart Output Pack is ON. Keep consent checked to receive analysis."
         : "Enable Smart Output Pack to activate this consent checkbox.";
     }
   };
@@ -560,7 +565,16 @@ async function onConvertSubmit(event) {
     const job = await pollJobStatus(result.jobId, success);
 
     if (job.status === "done") {
-      renderResult(result.jobId, mode);
+      renderResult(result.jobId, {
+        analysisMode: mode,
+        sourceName: file.name,
+        targetFormat,
+        preset,
+        outputName,
+        optimizeFor: optimizeFor || "balanced",
+        pageRange,
+        retainMetadata: Boolean(retainMetadata),
+      });
     } else {
       success.textContent = "Job failed. Please try again.";
       success.style.color = "var(--error)";
@@ -592,14 +606,32 @@ async function pollJobStatus(jobId, statusEl) {
   throw new Error("Processing timed out. Please try again.");
 }
 
-function renderResult(jobId, analysisMode) {
+function renderResult(jobId, conversionDetails) {
   const container = document.getElementById("app");
   const downloadUrl = getJobDownloadUrl(jobId);
-  const showInsights = analysisMode === "convert_plus_insights";
+  const details = typeof conversionDetails === "string"
+    ? { analysisMode: conversionDetails }
+    : conversionDetails || {};
+  const showInsights = details.analysisMode === "convert_plus_insights";
+  const summaryRows = [
+    `Source: ${details.sourceName || "Uploaded file"}`,
+    `Target format: ${(details.targetFormat || "Unknown").toUpperCase()}`,
+    `Mode: ${showInsights ? "Convert + Smart Output Pack" : "Convert only"}`,
+    `Preset: ${details.preset || "None"}`,
+    `Optimize for: ${details.optimizeFor || "balanced"}`,
+    `Output name: ${details.outputName || "Auto-generated"}`,
+    `Page range: ${details.pageRange || "All pages"}`,
+    `Metadata: ${details.retainMetadata ? "Retained" : "Not retained"}`,
+  ];
 
   container.innerHTML = `
     <section class="contact">
       <h1 class="section-title">Conversion Complete</h1>
+      <div class="result-summary">
+        <h3>What we changed</h3>
+        <ul>${summaryRows.map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ul>
+        <p class="field-hint">Retention: this job is temporary and auto-deleted after 30 minutes.</p>
+      </div>
       <div class="result-actions">
         <a class="btn btn-primary" href="${downloadUrl}" download>Download File</a>
         <button class="btn btn-ghost" id="delete-btn">Delete Now</button>
@@ -611,7 +643,10 @@ function renderResult(jobId, analysisMode) {
   `;
 
   document.getElementById("delete-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("delete-btn");
     const statusEl = document.getElementById("result-status");
+    btn.disabled = true;
+    btn.textContent = "Deleting...";
     try {
       await deleteJob(jobId);
       statusEl.textContent = "Job deleted.";
@@ -619,6 +654,8 @@ function renderResult(jobId, analysisMode) {
     } catch (e) {
       statusEl.textContent = "Delete failed: " + e.message;
       statusEl.style.color = "var(--error)";
+      btn.disabled = false;
+      btn.textContent = "Delete Now";
     }
   });
 

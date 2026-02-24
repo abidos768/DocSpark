@@ -75,6 +75,9 @@ export async function deleteJob(jobId) {
   const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`, {
     method: "DELETE",
   });
+  if (response.status === 404) {
+    return { success: true };
+  }
   if (!response.ok) {
     throw new Error(await parseError(response, "Delete request failed with status"));
   }

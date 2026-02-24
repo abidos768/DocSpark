@@ -645,6 +645,26 @@ body {
   margin: 1.2rem 0;
 }
 
+.result-summary {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  background: color-mix(in srgb, var(--surface-solid) 72%, transparent);
+}
+
+.result-summary h3 {
+  margin: 0 0 0.5rem;
+  font-family: Fraunces, Georgia, serif;
+}
+
+.result-summary ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--ink-soft);
+  display: grid;
+  gap: 0.25rem;
+}
+
 #insights-panel {
   margin-top: 1.5rem;
 }
