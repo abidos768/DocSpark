@@ -1,8 +1,6 @@
-module.exports = (req, res) => {
-  try {
-    const app = require("../backend/server");
-    res.json({ ok: true, type: typeof app });
-  } catch (err) {
-    res.json({ ok: false, error: err.message, stack: err.stack });
-  }
-};
+const express = require("express");
+const testApp = express();
+testApp.all("*", (req, res) => {
+  res.json({ works: true, path: req.path, url: req.url });
+});
+module.exports = testApp;
