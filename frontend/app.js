@@ -96,7 +96,7 @@ function renderConvert() {
                 <p class="dropzone-subtitle">or click to browse</p>
               </div>
               <input id="file" name="file" type="file" class="sr-only-file" />
-              <small class="field-hint">Supports PDF, DOCX, TXT up to 25MB.</small>
+              <small class="field-hint">Supports PDF, DOCX, TXT up to 250MB.</small>
               <small class="file-pill" id="file-pill">No file selected</small>
               <small class="error" id="file-error"></small>
             </label>
