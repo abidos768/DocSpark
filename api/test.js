@@ -1,6 +1,8 @@
-const express = require("express");
-const testApp = express();
-testApp.all("*", (req, res) => {
-  res.json({ works: true, path: req.path, url: req.url });
-});
-module.exports = testApp;
+module.exports = (req, res) => {
+  res.json({
+    CORS_ORIGINS: process.env.CORS_ORIGINS || "(not set)",
+    DATABASE_URL: process.env.DATABASE_URL ? "set" : "missing",
+    VERCEL: process.env.VERCEL || "(not set)",
+    CHALLENGE_PROVIDER: process.env.CHALLENGE_PROVIDER || "(not set)",
+  });
+};
