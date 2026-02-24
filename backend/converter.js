@@ -63,7 +63,9 @@ async function processJob(job) {
       await db.saveInsights(job.id, insights);
     }
 
-    await db.markJobDone(job.id, outPath);
+    const fileBuffer = fs.readFileSync(outPath);
+    const base64Data = fileBuffer.toString("base64");
+    await db.markJobDone(job.id, outPath, base64Data);
   } catch (err) {
     const reason = err?.message || "Conversion failed.";
     console.error(`Job ${job.id} failed:`, reason);
@@ -130,15 +132,6 @@ async function tryServerlessPdf(inputPath, outputPath, sourceExt, targetExt) {
   if (targetExt !== "pdf") return "serverless_pdf_not_target";
   if (!["html", "txt", "md"].includes(sourceExt)) return "serverless_pdf_source_unsupported";
 
-  let chromium;
-  let puppeteer;
-  try {
-    chromium = require("@sparticuz/chromium");
-    puppeteer = require("puppeteer-core");
-  } catch {
-    return "serverless_pdf_runtime_missing";
-  }
-
   let htmlContent = "";
   if (sourceExt === "html") {
     htmlContent = fs.readFileSync(inputPath, "utf8");
@@ -151,6 +144,25 @@ async function tryServerlessPdf(inputPath, outputPath, sourceExt, targetExt) {
     htmlContent = `<!doctype html><html><body><pre>${escaped}</pre></body></html>`;
   }
 
+  try {
+    const pdfBuffer = await generatePdfBufferFromHtml(htmlContent);
+    fs.writeFileSync(outputPath, pdfBuffer);
+    return null;
+  } catch (error) {
+    return `serverless_pdf_failed:${error.message}`;
+  }
+}
+
+async function generatePdfBufferFromHtml(htmlContent) {
+  let chromium;
+  let puppeteer;
+  try {
+    chromium = require("@sparticuz/chromium");
+    puppeteer = require("puppeteer-core");
+  } catch {
+    throw new Error("serverless_pdf_runtime_missing");
+  }
+
   let browser;
   try {
     const executablePath = await chromium.executablePath();
@@ -161,16 +173,12 @@ async function tryServerlessPdf(inputPath, outputPath, sourceExt, targetExt) {
       defaultViewport: { width: 1280, height: 720 },
     });
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
-    await page.pdf({
-      path: outputPath,
+    await page.setContent(String(htmlContent || ""), { waitUntil: "networkidle0" });
+    return await page.pdf({
       format: "A4",
       printBackground: true,
       preferCSSPageSize: true,
     });
-    return null;
-  } catch (error) {
-    return `serverless_pdf_failed:${error.message}`;
   } finally {
     if (browser) {
       try {
@@ -261,4 +269,4 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-module.exports = { processJob };
+module.exports = { processJob, generatePdfBufferFromHtml };

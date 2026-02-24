@@ -6,7 +6,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const { v4: uuidv4 } = require("uuid");
 const db = require("./db");
-const { processJob } = require("./converter");
+const { processJob, generatePdfBufferFromHtml } = require("./converter");
 const { startTTLWorker, removeJobFiles } = require("./ttl");
 
 const app = express();
@@ -276,6 +276,33 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "docspark-backend" });
 });
 
+app.post("/api/html-to-pdf", convertLimiter, limitActiveConversions, async (req, res) => {
+  const html = typeof req.body?.html === "string" ? req.body.html : "";
+  if (!html.trim()) {
+    return res.status(400).json({ error: "html (string) is required" });
+  }
+
+  const requestedName = typeof req.body?.filename === "string" ? req.body.filename.trim() : "";
+  const safeBaseName = (requestedName || "document").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "document";
+
+  try {
+    const pdfBuffer = await generatePdfBufferFromHtml(html);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="${safeBaseName}.pdf"`,
+      "Content-Length": String(pdfBuffer.length),
+    });
+    return res.send(pdfBuffer);
+  } catch (err) {
+    const reason = String(err?.message || "");
+    if (reason.includes("serverless_pdf_runtime_missing")) {
+      return res.status(503).json({ error: "PDF runtime is not available on this server." });
+    }
+    console.error("HTML->PDF error:", err);
+    return res.status(500).json({ error: "Failed to generate PDF" });
+  }
+});
+
 // =============================================
 // D-001: POST /api/convert
 // =============================================
@@ -405,12 +432,32 @@ app.get("/api/jobs/:id/download", readLimiter, async (req, res) => {
   if (job.status !== "done") {
     return res.status(409).json({ error: "Job is not yet complete", status: job.status });
   }
-  if (!job.converted_path || !fs.existsSync(job.converted_path)) {
-    return res.status(410).json({ error: "Converted file no longer available" });
+  if (job.converted_path && fs.existsSync(job.converted_path)) {
+    const downloadName = job.original_name.replace(/\.[^.]+$/, `.${job.target_format}`);
+    return res.download(job.converted_path, downloadName);
   }
 
-  const downloadName = job.original_name.replace(/\.[^.]+$/, `.${job.target_format}`);
-  res.download(job.converted_path, downloadName);
+  if (job.converted_data) {
+    const fileBuffer = Buffer.from(job.converted_data, "base64");
+    const downloadName = job.original_name.replace(/\.[^.]+$/, `.${job.target_format}`);
+    const mimeMap = {
+      pdf: "application/pdf",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      txt: "text/plain",
+      html: "text/html",
+      md: "text/markdown",
+      rtf: "application/rtf",
+      csv: "text/csv",
+    };
+    res.set({
+      "Content-Type": mimeMap[job.target_format] || "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${downloadName}"`,
+      "Content-Length": String(fileBuffer.length),
+    });
+    return res.send(fileBuffer);
+  }
+
+  return res.status(410).json({ error: "Converted file no longer available" });
 });
 
 // =============================================

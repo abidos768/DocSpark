@@ -2,7 +2,7 @@ const { parse } = require("url");
 const multipart = require("parse-multipart-data");
 const { v4: uuidv4 } = require("uuid");
 const db = require("../backend/db");
-const { processJob } = require("../backend/converter");
+const { processJob, generatePdfBufferFromHtml } = require("../backend/converter");
 
 const ALLOWED_INPUT = ["pdf", "docx", "txt", "html", "htm", "md", "rtf", "csv"];
 const ALLOWED_OUTPUT = ["pdf", "docx", "txt", "html", "md", "rtf", "csv"];
@@ -45,6 +45,11 @@ module.exports = async (req, res) => {
       return await handleConvert(req, res);
     }
 
+    // POST /api/html-to-pdf
+    if (pathname === "/api/html-to-pdf" && req.method === "POST") {
+      return await handleHtmlToPdf(req, res);
+    }
+
     // GET /api/jobs/:id
     const jobMatch = pathname.match(/^\/api\/jobs\/([^/]+)$/);
     if (jobMatch && req.method === "GET") {
@@ -64,7 +69,28 @@ module.exports = async (req, res) => {
       const job = await db.getJob(dlMatch[1]);
       if (!job) return res.status(404).json({ error: "Job not found" });
       if (job.status !== "done") return res.status(409).json({ error: "Job not yet complete" });
-      return res.status(200).json({ error: "File download not available in serverless mode" });
+
+      if (!job.converted_data) {
+        return res.status(410).json({ error: "Converted file no longer available" });
+      }
+
+      const fileBuffer = Buffer.from(job.converted_data, "base64");
+      const downloadName = job.original_name.replace(/\.[^.]+$/, `.${job.target_format}`);
+      const mimeMap = {
+        pdf: "application/pdf",
+        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        txt: "text/plain",
+        html: "text/html",
+        md: "text/markdown",
+        rtf: "application/rtf",
+        csv: "text/csv",
+      };
+      const contentType = mimeMap[job.target_format] || "application/octet-stream";
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${downloadName}"`);
+      res.setHeader("Content-Length", String(fileBuffer.length));
+      return res.status(200).send(fileBuffer);
     }
 
     // GET /api/jobs/:id/insights
@@ -186,4 +212,46 @@ async function handleConvert(req, res) {
     });
   }
   return res.status(201).json({ jobId: completed.id, status: completed.status });
+}
+
+async function handleHtmlToPdf(req, res) {
+  const contentType = String(req.headers["content-type"] || "").toLowerCase();
+  if (!contentType.includes("application/json")) {
+    return res.status(400).json({ error: "Expected application/json body with { html }" });
+  }
+
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
+
+  const html = typeof payload?.html === "string" ? payload.html : "";
+  if (!html.trim()) {
+    return res.status(400).json({ error: "html (string) is required" });
+  }
+
+  const requestedName = typeof payload?.filename === "string" ? payload.filename.trim() : "";
+  const safeBaseName = (requestedName || "document").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "document";
+
+  try {
+    const pdfBuffer = await generatePdfBufferFromHtml(html);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename=\"${safeBaseName}.pdf\"`);
+    res.setHeader("Content-Length", String(pdfBuffer.length));
+    return res.status(200).send(pdfBuffer);
+  } catch (err) {
+    const reason = String(err?.message || "");
+    if (reason.includes("serverless_pdf_runtime_missing")) {
+      return res.status(503).json({ error: "PDF runtime is not available on this server." });
+    }
+    console.error("html-to-pdf error:", err);
+    return res.status(500).json({ error: "Failed to generate PDF" });
+  }
 }

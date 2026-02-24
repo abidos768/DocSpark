@@ -47,6 +47,7 @@ async function ensureSchema() {
     );
     CREATE INDEX IF NOT EXISTS idx_jobs_expires_at ON jobs (expires_at);
     ALTER TABLE jobs ADD COLUMN IF NOT EXISTS failure_reason TEXT;
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS converted_data TEXT;
   `);
   schemaInitialized = true;
 }
@@ -86,11 +87,11 @@ async function updateJobStatus(id, status, progress) {
   await query("UPDATE jobs SET status = $1, progress = $2 WHERE id = $3", [status, progress, id]);
 }
 
-async function markJobDone(id, convertedPath) {
+async function markJobDone(id, convertedPath, convertedDataBase64) {
   await ensureSchema();
   await query(
-    "UPDATE jobs SET converted_path = $1, status = 'done', progress = 100, failure_reason = NULL WHERE id = $2",
-    [convertedPath, id]
+    "UPDATE jobs SET converted_path = $1, status = 'done', progress = 100, failure_reason = NULL, converted_data = $2 WHERE id = $3",
+    [convertedPath, convertedDataBase64 || null, id]
   );
 }
 
