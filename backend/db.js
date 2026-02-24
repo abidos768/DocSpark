@@ -1,98 +1,69 @@
 require("dotenv").config();
-const { createClient } = require("@supabase/supabase-js");
+const { Pool } = require("pg");
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
 async function createJob(job) {
-  const row = {
-    id: job.id,
-    original_name: job.originalName,
-    original_path: job.originalPath,
-    target_format: job.targetFormat,
-    preset: job.preset,
-    analysis_mode: job.analysisMode,
-    analysis_consent: job.analysisConsent,
-    status: job.status,
-    progress: job.progress,
-    created_at: job.createdAt,
-    expires_at: job.expiresAt,
-  };
-
-  const { error } = await supabase.from("jobs").insert(row);
-  if (error) throw new Error(`createJob failed: ${error.message}`);
-
+  await pool.query(
+    `INSERT INTO jobs (id, original_name, original_path, target_format, preset,
+                       analysis_mode, analysis_consent, status, progress,
+                       created_at, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      job.id, job.originalName, job.originalPath, job.targetFormat, job.preset,
+      job.analysisMode, job.analysisConsent, job.status, job.progress,
+      job.createdAt, job.expiresAt,
+    ]
+  );
   return getJob(job.id);
 }
 
 async function getJob(id) {
-  const { data, error } = await supabase
-    .from("jobs")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error && error.code === "PGRST116") return null;
-  if (error) throw new Error(`getJob failed: ${error.message}`);
-  return data;
+  const { rows } = await pool.query("SELECT * FROM jobs WHERE id = $1", [id]);
+  return rows[0] || null;
 }
 
 async function updateJobStatus(id, status, progress) {
-  const { error } = await supabase
-    .from("jobs")
-    .update({ status, progress })
-    .eq("id", id);
-
-  if (error) throw new Error(`updateJobStatus failed: ${error.message}`);
+  await pool.query(
+    "UPDATE jobs SET status = $1, progress = $2 WHERE id = $3",
+    [status, progress, id]
+  );
 }
 
 async function markJobDone(id, convertedPath) {
-  const { error } = await supabase
-    .from("jobs")
-    .update({ converted_path: convertedPath, status: "done", progress: 100 })
-    .eq("id", id);
-
-  if (error) throw new Error(`markJobDone failed: ${error.message}`);
+  await pool.query(
+    "UPDATE jobs SET converted_path = $1, status = 'done', progress = 100 WHERE id = $2",
+    [convertedPath, id]
+  );
 }
 
 async function markJobFailed(id) {
-  const { error } = await supabase
-    .from("jobs")
-    .update({ status: "failed" })
-    .eq("id", id);
-
-  if (error) throw new Error(`markJobFailed failed: ${error.message}`);
+  await pool.query("UPDATE jobs SET status = 'failed' WHERE id = $1", [id]);
 }
 
 async function saveInsights(id, insights) {
-  const { error } = await supabase
-    .from("jobs")
-    .update({ insights: JSON.stringify(insights) })
-    .eq("id", id);
-
-  if (error) throw new Error(`saveInsights failed: ${error.message}`);
+  await pool.query("UPDATE jobs SET insights = $1 WHERE id = $2", [
+    JSON.stringify(insights),
+    id,
+  ]);
 }
 
 async function deleteJob(id) {
   const job = await getJob(id);
   if (!job) return null;
-
-  const { error } = await supabase.from("jobs").delete().eq("id", id);
-  if (error) throw new Error(`deleteJob failed: ${error.message}`);
-
+  await pool.query("DELETE FROM jobs WHERE id = $1", [id]);
   return job;
 }
 
 async function getExpiredJobs() {
-  const { data, error } = await supabase
-    .from("jobs")
-    .select("*")
-    .lte("expires_at", new Date().toISOString());
-
-  if (error) throw new Error(`getExpiredJobs failed: ${error.message}`);
-  return data || [];
+  const { rows } = await pool.query(
+    "SELECT * FROM jobs WHERE expires_at <= $1",
+    [new Date().toISOString()]
+  );
+  return rows;
 }
 
 module.exports = {
