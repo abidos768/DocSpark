@@ -35,7 +35,12 @@ module.exports = async (req, res) => {
     if (jobMatch && req.method === "GET") {
       const job = await db.getJob(jobMatch[1]);
       if (!job) return res.status(404).json({ error: "Job not found" });
-      return res.status(200).json({ jobId: job.id, status: job.status, progress: job.progress });
+      return res.status(200).json({
+        jobId: job.id,
+        status: job.status,
+        progress: job.progress,
+        failureReason: job.failure_reason || "",
+      });
     }
 
     // GET /api/jobs/:id/download
@@ -105,11 +110,14 @@ async function handleConvert(req, res) {
 
   let ext = (filePart.filename.split(".").pop() || "").toLowerCase();
   if (ext === "htm") ext = "html";
+  if (ext === "markdown") ext = "md";
   if (!ALLOWED_INPUT.includes(ext)) {
     return res.status(400).json({ error: `Unsupported input: ${ext}` });
   }
 
-  const targetFormat = (fields.targetFormat || "").toLowerCase();
+  let targetFormat = (fields.targetFormat || "").toLowerCase();
+  if (targetFormat === "htm") targetFormat = "html";
+  if (targetFormat === "markdown") targetFormat = "md";
   if (!ALLOWED_OUTPUT.includes(targetFormat)) {
     return res.status(400).json({ error: `Unsupported target: ${targetFormat}` });
   }
@@ -155,5 +163,12 @@ async function handleConvert(req, res) {
   await processJob(job);
 
   const completed = await db.getJob(job.id);
+  if (completed.status !== "done") {
+    return res.status(422).json({
+      error: completed.failure_reason || "Requested conversion is not supported by the current converter.",
+      jobId: completed.id,
+      status: completed.status,
+    });
+  }
   return res.status(201).json({ jobId: completed.id, status: completed.status });
 }
