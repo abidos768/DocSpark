@@ -207,6 +207,7 @@ async function handleConvert(req, res) {
   if (completed.status !== "done") {
     return res.status(422).json({
       error: toPublicFailureMessage(completed.failure_reason),
+      debug_reason: completed.failure_reason,
       jobId: completed.id,
       status: completed.status,
     });
