@@ -1,88 +1,13 @@
-const path = require("path");
-const Database = require("better-sqlite3");
+require("dotenv").config();
+const { createClient } = require("@supabase/supabase-js");
 
-const DB_PATH = path.join(__dirname, "docspark.db");
-const db = new Database(DB_PATH);
-
-db.pragma("journal_mode = WAL");
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS jobs (
-    id TEXT PRIMARY KEY,
-    original_name TEXT NOT NULL,
-    original_path TEXT NOT NULL,
-    converted_path TEXT,
-    target_format TEXT NOT NULL,
-    preset TEXT,
-    analysis_mode TEXT NOT NULL,
-    analysis_consent INTEGER NOT NULL DEFAULT 0,
-    insights TEXT,
-    status TEXT NOT NULL,
-    progress INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL,
-    expires_at TEXT NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_jobs_expires_at ON jobs(expires_at);
-`);
-
-const insertJobStmt = db.prepare(`
-  INSERT INTO jobs (
-    id,
-    original_name,
-    original_path,
-    target_format,
-    preset,
-    analysis_mode,
-    analysis_consent,
-    status,
-    progress,
-    created_at,
-    expires_at
-  )
-  VALUES (
-    @id,
-    @original_name,
-    @original_path,
-    @target_format,
-    @preset,
-    @analysis_mode,
-    @analysis_consent,
-    @status,
-    @progress,
-    @created_at,
-    @expires_at
-  )
-`);
-
-const getJobStmt = db.prepare(`SELECT * FROM jobs WHERE id = ?`);
-const updateStatusStmt = db.prepare(`
-  UPDATE jobs
-  SET status = ?, progress = ?
-  WHERE id = ?
-`);
-const markDoneStmt = db.prepare(`
-  UPDATE jobs
-  SET converted_path = ?, status = 'done', progress = 100
-  WHERE id = ?
-`);
-const markFailedStmt = db.prepare(`
-  UPDATE jobs
-  SET status = 'failed'
-  WHERE id = ?
-`);
-const saveInsightsStmt = db.prepare(`
-  UPDATE jobs
-  SET insights = ?
-  WHERE id = ?
-`);
-const deleteJobStmt = db.prepare(`DELETE FROM jobs WHERE id = ?`);
-const expiredJobsStmt = db.prepare(`
-  SELECT * FROM jobs
-  WHERE expires_at <= ?
-`);
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 async function createJob(job) {
-  insertJobStmt.run({
+  const row = {
     id: job.id,
     original_name: job.originalName,
     original_path: job.originalPath,
@@ -94,39 +19,80 @@ async function createJob(job) {
     progress: job.progress,
     created_at: job.createdAt,
     expires_at: job.expiresAt,
-  });
+  };
+
+  const { error } = await supabase.from("jobs").insert(row);
+  if (error) throw new Error(`createJob failed: ${error.message}`);
+
   return getJob(job.id);
 }
 
 async function getJob(id) {
-  return getJobStmt.get(id) || null;
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error && error.code === "PGRST116") return null;
+  if (error) throw new Error(`getJob failed: ${error.message}`);
+  return data;
 }
 
 async function updateJobStatus(id, status, progress) {
-  updateStatusStmt.run(status, progress, id);
+  const { error } = await supabase
+    .from("jobs")
+    .update({ status, progress })
+    .eq("id", id);
+
+  if (error) throw new Error(`updateJobStatus failed: ${error.message}`);
 }
 
 async function markJobDone(id, convertedPath) {
-  markDoneStmt.run(convertedPath, id);
+  const { error } = await supabase
+    .from("jobs")
+    .update({ converted_path: convertedPath, status: "done", progress: 100 })
+    .eq("id", id);
+
+  if (error) throw new Error(`markJobDone failed: ${error.message}`);
 }
 
 async function markJobFailed(id) {
-  markFailedStmt.run(id);
+  const { error } = await supabase
+    .from("jobs")
+    .update({ status: "failed" })
+    .eq("id", id);
+
+  if (error) throw new Error(`markJobFailed failed: ${error.message}`);
 }
 
 async function saveInsights(id, insights) {
-  saveInsightsStmt.run(JSON.stringify(insights), id);
+  const { error } = await supabase
+    .from("jobs")
+    .update({ insights: JSON.stringify(insights) })
+    .eq("id", id);
+
+  if (error) throw new Error(`saveInsights failed: ${error.message}`);
 }
 
 async function deleteJob(id) {
   const job = await getJob(id);
   if (!job) return null;
-  deleteJobStmt.run(id);
+
+  const { error } = await supabase.from("jobs").delete().eq("id", id);
+  if (error) throw new Error(`deleteJob failed: ${error.message}`);
+
   return job;
 }
 
 async function getExpiredJobs() {
-  return expiredJobsStmt.all(new Date().toISOString());
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("*")
+    .lte("expires_at", new Date().toISOString());
+
+  if (error) throw new Error(`getExpiredJobs failed: ${error.message}`);
+  return data || [];
 }
 
 module.exports = {

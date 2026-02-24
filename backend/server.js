@@ -17,13 +17,16 @@ const ALLOWED_INPUT_FORMATS = ["pdf", "docx", "txt"];
 const ALLOWED_OUTPUT_FORMATS = ["pdf", "docx", "txt"];
 const ALLOWED_PRESETS = ["resume-safe", "print-safe", "mobile-safe"];
 
+// Use /tmp on Vercel (serverless), local dirs otherwise
+const IS_VERCEL = !!process.env.VERCEL;
+const uploadsDir = IS_VERCEL ? "/tmp/uploads" : path.join(__dirname, "uploads");
+const convertedDir = IS_VERCEL ? "/tmp/converted" : path.join(__dirname, "converted");
+
 // -- Middleware --
 app.use(cors());
 app.use(express.json());
 
-// -- Multer setup --
-const uploadsDir = path.join(__dirname, "uploads");
-const convertedDir = path.join(__dirname, "converted");
+// -- Ensure dirs exist --
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -44,7 +47,6 @@ app.get("/api/health", (req, res) => {
 // D-001: POST /api/convert
 // =============================================
 app.post("/api/convert", upload.single("file"), async (req, res) => {
-  // Validate file
   if (!req.file) {
     return res.status(400).json({ error: "File is required" });
   }
@@ -55,35 +57,30 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
     return res.status(400).json({ error: `Unsupported input format: ${ext}. Allowed: ${ALLOWED_INPUT_FORMATS.join(", ")}` });
   }
 
-  // Validate targetFormat
   const targetFormat = (req.body.targetFormat || "").toLowerCase();
   if (!ALLOWED_OUTPUT_FORMATS.includes(targetFormat)) {
     fs.unlinkSync(req.file.path);
     return res.status(400).json({ error: `Unsupported target format: ${targetFormat}. Allowed: ${ALLOWED_OUTPUT_FORMATS.join(", ")}` });
   }
 
-  // Validate preset (optional)
   const preset = req.body.preset || null;
   if (preset && !ALLOWED_PRESETS.includes(preset)) {
     fs.unlinkSync(req.file.path);
     return res.status(400).json({ error: `Invalid preset: ${preset}. Allowed: ${ALLOWED_PRESETS.join(", ")}` });
   }
 
-  // Validate analysisMode
   const analysisMode = req.body.analysisMode || "convert_only";
   if (!["convert_only", "convert_plus_insights"].includes(analysisMode)) {
     fs.unlinkSync(req.file.path);
     return res.status(400).json({ error: "analysisMode must be 'convert_only' or 'convert_plus_insights'" });
   }
 
-  // Validate consent when insights requested
   const analysisConsent = req.body.analysisConsent === "true" || req.body.analysisConsent === true;
   if (analysisMode === "convert_plus_insights" && !analysisConsent) {
     fs.unlinkSync(req.file.path);
     return res.status(400).json({ error: "analysisConsent is required when analysisMode is 'convert_plus_insights'" });
   }
 
-  // Create job
   const now = new Date();
   const expiresAt = new Date(now.getTime() + TTL_MINUTES * 60_000);
   const jobId = uuidv4();
@@ -102,7 +99,7 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
     expiresAt: expiresAt.toISOString(),
   });
 
-  // Start async processing
+  // Start async processing (don't await — runs in background)
   processJob(job);
 
   res.status(201).json({ jobId: job.id, status: job.status });
@@ -181,8 +178,12 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-// -- Start --
-app.listen(PORT, HOST, () => {
-  console.log(`[DocSpark] Backend running on http://${HOST}:${PORT}`);
-  startTTLWorker();
-});
+// -- Start server only when not on Vercel --
+if (!IS_VERCEL) {
+  app.listen(PORT, HOST, () => {
+    console.log(`[DocSpark] Backend running on http://${HOST}:${PORT}`);
+    startTTLWorker();
+  });
+}
+
+module.exports = app;
