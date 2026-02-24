@@ -12,6 +12,27 @@ if (!fs.existsSync(CONVERTED_DIR)) {
   fs.mkdirSync(CONVERTED_DIR, { recursive: true });
 }
 
+function findExecutable(name, knownPaths) {
+  for (const p of knownPaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return name; // fall back to bare name (relies on PATH)
+}
+
+const PANDOC_BIN = findExecutable("pandoc", [
+  path.join(process.env.LOCALAPPDATA || "", "Pandoc", "pandoc.exe"),
+  "C:\\Program Files\\Pandoc\\pandoc.exe",
+  "/usr/local/bin/pandoc",
+  "/usr/bin/pandoc",
+]);
+
+const SOFFICE_BIN = findExecutable("soffice", [
+  "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+  "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
+  "/usr/bin/soffice",
+  "/usr/local/bin/soffice",
+]);
+
 function normalizeFormat(format) {
   const normalized = String(format || "").trim().toLowerCase();
   if (normalized === "htm") return "html";
@@ -102,7 +123,7 @@ async function convertFile(inputPath, outputPath, sourceExt, targetExt) {
 
 async function tryPandoc(inputPath, outputPath) {
   try {
-    await runExecFile("pandoc", [inputPath, "-o", outputPath], { timeout: 15000 });
+    await runExecFile(PANDOC_BIN, [inputPath, "-o", outputPath], { timeout: 15000 });
     return null;
   } catch (error) {
     if (error?.code === "ENOENT") {
@@ -128,7 +149,7 @@ async function trySoffice(inputPath, outputPath, targetExt) {
   const outDir = path.dirname(outputPath);
   try {
     await runExecFile(
-      "soffice",
+      SOFFICE_BIN,
       ["--headless", "--convert-to", sofficeTarget(targetExt), "--outdir", outDir, inputPath],
       { timeout: 25000 }
     );
