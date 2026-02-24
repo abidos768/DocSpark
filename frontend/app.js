@@ -437,11 +437,20 @@ function setupConvertFormUx() {
     syncFileState();
   };
 
-  dropzone?.addEventListener("click", () => fileInput?.click());
+  dropzone?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!fileInput) return;
+    // Reset so choosing the same file again still triggers "change".
+    fileInput.value = "";
+    fileInput.click();
+  });
   dropzone?.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      fileInput?.click();
+      if (!fileInput) return;
+      fileInput.value = "";
+      fileInput.click();
     }
   });
   dropzone?.addEventListener("dragover", (event) => {
